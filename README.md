@@ -86,3 +86,6 @@ extending to match the protocol described in the paper
 - [ ] Add phi-accrual failure detector
 - [ ] Config
 	* Max entries per delta: used to limit the rate gossips receive entries
+- [ ] Add CI
+- [ ] Load test evaluation
+	* Look at reproducing the papers results
