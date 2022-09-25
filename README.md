@@ -50,6 +50,12 @@ Assuming you have Go installed, simply build with
 $ go build
 ```
 
+### API Docs
+Show the API docs with
+```bash
+$ go doc --all
+```
+
 ### Testing
 Tests are split into unit and system tests.
 
