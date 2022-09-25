@@ -77,8 +77,12 @@ The basic implementation does now work, though is only a simplified version of
 Scuttlebutt so still needs work.
 - [ ] Push/pull
 - [ ] Limit digests and deltas size to MTU
+	* When deltas exceeds the MTU - send the deltas with the most entries to
+send the oldest entries first
 - [ ] Protocol: currently only a simplified version of Scuttlebutt, needs
 extending to match the protocol described in the paper
 - [ ] Binary protocol
 - [ ] API docs
 - [ ] Add phi-accrual failure detector
+- [ ] Config
+	* Max entries per delta: used to limit the rate gossips receive entries

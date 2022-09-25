@@ -73,7 +73,7 @@ func (g *Gossip) Join(seeds []string) error {
 			continue
 		}
 
-		if err := g.syncNode(addr); err != nil {
+		if err := g.sendDigest(addr, true); err != nil {
 			errs = multierror.Append(errs, err)
 		}
 	}
@@ -112,23 +112,6 @@ func (g *Gossip) schedule() {
 	go g.gossipLoop()
 }
 
-func (g *Gossip) syncNode(addr string) error {
-	digest := g.peerMap.Digest()
-	req := Request{
-		Type:   "digest",
-		Digest: &digest,
-	}
-	b, err := json.Marshal(&req)
-	if err != nil {
-		return fmt.Errorf("failed to encode digest: %v", err)
-	}
-	_, err = g.transport.WriteTo(b, addr)
-	if err != nil {
-		return fmt.Errorf("failed to write to peer %s: %v", addr, err)
-	}
-	return nil
-}
-
 func (g *Gossip) gossipLoop() {
 	defer g.wg.Done()
 
@@ -158,7 +141,7 @@ func (g *Gossip) gossip() {
 	if !ok {
 		return
 	}
-	g.syncNode(addr)
+	g.sendDigest(addr, true)
 }
 
 func (g *Gossip) handleMessage(packet *Packet) {
@@ -170,7 +153,7 @@ func (g *Gossip) handleMessage(packet *Packet) {
 
 	switch req.Type {
 	case "digest":
-		g.handleDigest(req.Digest, packet.From.String())
+		g.handleDigest(req.Digest, packet.From.String(), req.Request)
 	case "delta":
 		g.handleDelta(req.Delta)
 	default:
@@ -178,26 +161,67 @@ func (g *Gossip) handleMessage(packet *Packet) {
 	}
 }
 
-func (g *Gossip) handleDigest(digest *Digest, addr string) {
+func (g *Gossip) handleDigest(digest *Digest, addr string, request bool) {
+	// Add any peers we didn't know existed to the peer map.
 	g.peerMap.ApplyDigest(*digest)
 
 	delta := g.peerMap.Deltas(*digest)
-	req := Request{
-		Type:  "delta",
-		Delta: &delta,
-	}
-	b, err := json.Marshal(&req)
-	if err != nil {
-		g.logger.Println("[WARN] scuttlebutt: failed to encode delta:", err)
-		return
+	// Only send the delta if it is not empty. Note we don't care about sending
+	// to prove liveness given we send our own digest immediately anyway.
+	if len(delta) > 0 {
+		g.sendDelta(addr, delta)
 	}
 
-	if _, err = g.transport.WriteTo(b, addr); err != nil {
-		g.logger.Println("[ERR] scuttlebutt: failed to write to transport:", err)
-		return
+	// Only respond with our own digest if the peers digest was a request.
+	// Otherwise we get stuck in a loop sending digests back and forth.
+	//
+	// Note we respond with a digest even if our digests are the same, since
+	// the peer uses the response to check liveness.
+	if request {
+		g.sendDigest(addr, false)
 	}
 }
 
 func (g *Gossip) handleDelta(delta *Delta) {
 	g.peerMap.ApplyDeltas(*delta)
+}
+
+func (g *Gossip) sendDigest(addr string, request bool) error {
+	digest := g.peerMap.Digest()
+	req := Request{
+		Type:    "digest",
+		Request: request,
+		Digest:  &digest,
+	}
+	b, err := json.Marshal(&req)
+	if err != nil {
+		g.logger.Println("[WARN] scuttlebutt: failed to encode digest:", err)
+		return fmt.Errorf("failed to encode digest: %v", err)
+	}
+	_, err = g.transport.WriteTo(b, addr)
+	if err != nil {
+		g.logger.Println("[ERR] scuttlebutt: failed to write to transport:", err)
+		return fmt.Errorf("failed to write to transport %s: %v", addr, err)
+	}
+	return nil
+}
+
+func (g *Gossip) sendDelta(addr string, delta Delta) error {
+	req := Request{
+		Type:    "delta",
+		Request: true,
+		Delta:   &delta,
+	}
+
+	b, err := json.Marshal(&req)
+	if err != nil {
+		g.logger.Println("[WARN] scuttlebutt: failed to encode delta:", err)
+		return fmt.Errorf("failed to encode delta: %v", err)
+	}
+
+	if _, err = g.transport.WriteTo(b, addr); err != nil {
+		g.logger.Println("[ERR] scuttlebutt: failed to write to transport:", err)
+		return fmt.Errorf("failed to write to transport %s: %v", addr, err)
+	}
+	return nil
 }
