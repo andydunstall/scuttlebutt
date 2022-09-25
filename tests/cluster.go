@@ -72,6 +72,7 @@ func (c *Cluster) AddNode(peerID string, nodeSub scuttlebutt.NodeSubscriber, eve
 		ID: peerID,
 		// Use a port of 0 to let the system assigned a free port.
 		BindAddr:        "127.0.0.1:0",
+		GossipInterval:  time.Millisecond * 100,
 		NodeSubscriber:  nodeSub,
 		EventSubscriber: eventSub,
 	}

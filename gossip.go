@@ -13,11 +13,12 @@ import (
 )
 
 type Gossip struct {
-	peerMap   *PeerMap
-	transport Transport
-	done      chan struct{}
-	wg        sync.WaitGroup
-	logger    *log.Logger
+	peerMap        *PeerMap
+	gossipInterval time.Duration
+	transport      Transport
+	done           chan struct{}
+	wg             sync.WaitGroup
+	logger         *log.Logger
 }
 
 // Create will create a new Gossip using the given configuration.
@@ -26,33 +27,9 @@ type Gossip struct {
 // After creating a Gossip, the configuration given should not be
 // modified by the user anymore.
 func Create(conf *Config) (*Gossip, error) {
-	logger := conf.Logger
-	if logger == nil {
-		logger = log.New(os.Stderr, "", log.LstdFlags)
-	}
-
-	transport := conf.Transport
-	if transport == nil {
-		var err error
-		transport, err = NewUDPTransport(conf.BindAddr, logger)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	g := &Gossip{
-		peerMap: NewPeerMap(
-			conf.ID,
-			// Note use transport bind addr not configured bind addr as these
-			// may be different if the system assigns the port.
-			transport.BindAddr(),
-			conf.NodeSubscriber,
-			conf.EventSubscriber,
-		),
-		transport: transport,
-		done:      make(chan struct{}),
-		wg:        sync.WaitGroup{},
-		logger:    logger,
+	g, err := newGossip(conf)
+	if err != nil {
+		return nil, err
 	}
 	g.schedule()
 	return g, nil
@@ -107,6 +84,52 @@ func (g *Gossip) Shutdown() error {
 	return err
 }
 
+func newGossip(conf *Config) (*Gossip, error) {
+	if conf.ID == "" {
+		return nil, fmt.Errorf("config missing a node ID")
+	}
+
+	if conf.BindAddr == "" {
+		return nil, fmt.Errorf("config missing a bind addr")
+	}
+
+	// By default gossip every 500ms.
+	gossipInterval := conf.GossipInterval
+	if gossipInterval == 0 {
+		gossipInterval = time.Millisecond * 500
+	}
+
+	logger := conf.Logger
+	if logger == nil {
+		logger = log.New(os.Stderr, "", log.LstdFlags)
+	}
+
+	transport := conf.Transport
+	if transport == nil {
+		var err error
+		transport, err = NewUDPTransport(conf.BindAddr, logger)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &Gossip{
+		peerMap: NewPeerMap(
+			conf.ID,
+			// Note use transport bind addr not configured bind addr as these
+			// may be different if the system assigns the port.
+			transport.BindAddr(),
+			conf.NodeSubscriber,
+			conf.EventSubscriber,
+		),
+		gossipInterval: gossipInterval,
+		transport:      transport,
+		done:           make(chan struct{}),
+		wg:             sync.WaitGroup{},
+		logger:         logger,
+	}, nil
+}
+
 func (g *Gossip) schedule() {
 	g.wg.Add(1)
 	go g.gossipLoop()
@@ -115,7 +138,7 @@ func (g *Gossip) schedule() {
 func (g *Gossip) gossipLoop() {
 	defer g.wg.Done()
 
-	ticker := time.NewTicker(time.Millisecond * 100)
+	ticker := time.NewTicker(g.gossipInterval)
 	defer ticker.Stop()
 
 	for {

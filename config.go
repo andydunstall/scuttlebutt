@@ -2,6 +2,7 @@ package scuttlebutt
 
 import (
 	"log"
+	"time"
 )
 
 type Config struct {
@@ -14,6 +15,11 @@ type Config struct {
 	// Transport used to communicate with other nodes. If unset gossip
 	// uses UDPTransport listening on BindAddr.
 	Transport Transport
+
+	// GossipInterval is the time between gossip rounds, when the node selects
+	// a random peer to sync with.
+	// If not set defaults to 500ms.
+	GossipInterval time.Duration
 
 	// NodeSubscriber subscribes to events relating to nodes joining and leaving
 	// the cluster.
