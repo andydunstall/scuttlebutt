@@ -145,19 +145,19 @@ func (g *Gossip) gossip() {
 }
 
 func (g *Gossip) handleMessage(packet *Packet) {
-	var req Request
-	if err := json.Unmarshal(packet.Buf, &req); err != nil {
-		g.logger.Println("[WARN] scuttlebutt: invalid request received")
+	var m Message
+	if err := json.Unmarshal(packet.Buf, &m); err != nil {
+		g.logger.Println("[WARN] scuttlebutt: invalid message received")
 		return
 	}
 
-	switch req.Type {
+	switch m.Type {
 	case "digest":
-		g.handleDigest(req.Digest, packet.From.String(), req.Request)
+		g.handleDigest(m.Digest, packet.From.String(), m.Request)
 	case "delta":
-		g.handleDelta(req.Delta)
+		g.handleDelta(m.Delta)
 	default:
-		g.logger.Println("[WARN] scuttlebutt: unrecognised request type:", req.Type)
+		g.logger.Println("[WARN] scuttlebutt: unrecognised message type:", m.Type)
 	}
 }
 
@@ -188,12 +188,12 @@ func (g *Gossip) handleDelta(delta *Delta) {
 
 func (g *Gossip) sendDigest(addr string, request bool) error {
 	digest := g.peerMap.Digest()
-	req := Request{
+	m := Message{
 		Type:    "digest",
 		Request: request,
 		Digest:  &digest,
 	}
-	b, err := json.Marshal(&req)
+	b, err := json.Marshal(&m)
 	if err != nil {
 		g.logger.Println("[WARN] scuttlebutt: failed to encode digest:", err)
 		return fmt.Errorf("failed to encode digest: %v", err)
@@ -207,13 +207,13 @@ func (g *Gossip) sendDigest(addr string, request bool) error {
 }
 
 func (g *Gossip) sendDelta(addr string, delta Delta) error {
-	req := Request{
+	m := Message{
 		Type:    "delta",
 		Request: true,
 		Delta:   &delta,
 	}
 
-	b, err := json.Marshal(&req)
+	b, err := json.Marshal(&m)
 	if err != nil {
 		g.logger.Println("[WARN] scuttlebutt: failed to encode delta:", err)
 		return fmt.Errorf("failed to encode delta: %v", err)

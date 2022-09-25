@@ -1,6 +1,6 @@
 package scuttlebutt
 
-type Request struct {
+type Message struct {
 	// Type of message.
 	Type string `json:"type,omitempty"`
 	// Request is a flag indicating this is a request rather than replying to
