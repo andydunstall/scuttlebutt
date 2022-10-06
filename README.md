@@ -19,29 +19,59 @@ other node. The application can subscribe to updates and lookup key-value
 pairs for a given node.
 
 ## Usage
+The full API docs can be viewed with `go doc --all`.
+
+**Create a gossip node**
+
+Creates a new node, which will start listening for updates from nodes in the
+cluster. Since it does not yet know about any other nodes, it will not join
+the cluster unless contacted by another node.
+
 ```go
 node := scuttlebutt.Create(&scuttlebutt.Config{
 	ID: "node-1",
 	BindAddr: "0.0.0.0:8119",
-	// Subscribe to updates about other nodes.
-	EventSubscriber: sub,
+	// Subscribe to events about nodes joining and leaving.
+	NodeSubscriber: mySubscriber,
+	// Subscribe to state updates from other nodes.
+	StateSubscriber: mySubscriber,
 })
+```
 
-// Set this nodes state to be propagated to other nodes when joining.
-node.UpdateLocal("service", "ordering")
+**Join the cluster**
+
+To join the cluster we must tell the node the address of at least one other
+node in the cluster. Once it syncs with these nodes it will learn about other
+nodes in the cluster and contact them directly in the future.
+
+```go
+node.Seed([]string{"10.26.104.52:9992", "10.26.104.56:7331"})
+```
+
+**Update our nodes state**
+
+Updates our nodes local state, which will be propagated to other nodes in the
+cluster and notify their subscribes of the update.
+
+```go
 node.UpdateLocal("rpcAddr", "10.25.104.42:5112")
-node.UpdateLocal("state", "booting")
+node.UpdateLocal("state", "ready")
+```
 
-// Join an existing cluster by specifying at least on known peer.
-node.Join([]string{"10.26.104.52:9992", "10.26.104.56:7331"})
+**Lookup the known state of another node**
 
-// ...
+Looks up the state of the peer as known by this node. Since the cluster
+membership is eventually consistent this may be out of date with the actual
+peer, though should converge quickly.
 
-// Update this nodes state, which will be propagated to other nodes (and notify
-// subscribers of those nodes).
-node.UpdateLocal("state", "active")
+Note typically you'll subscribe to updates with `Config.StateSubscriber`
+rather than querying directly.
 
-// ...
+```go
+addr, ok := node.Lookup("peer-2", "rpcAddr")
+if !ok {
+	// ...
+}
 ```
 
 ## Building
@@ -76,6 +106,8 @@ $ go test ./...
 The basic implementation does now work, though is only a simplified version of
 Scuttlebutt so still needs work.
 - [ ] Push/pull
+- [ ] Add configurable initial state to avoid sending an empty node state when
+first joining
 - [ ] Limit digests and deltas size to MTU
 	* When deltas exceeds the MTU - send the deltas with the most entries to
 send the oldest entries first

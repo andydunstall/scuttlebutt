@@ -24,10 +24,10 @@ type Gossip struct {
 }
 
 // Create will create a new Gossip using the given configuration.
-// This will not connect to any other node (see Join) yet, but will start
-// all the listeners to allow other nodes to join this memberlist.
-// After creating a Gossip, the configuration given should not be
-// modified by the user anymore.
+// This will start listening on the network to allow other nodes to join, though
+// will not attempt to join the cluster itself unless contacted by another
+// node.
+// After this the given configuration should not be modified again.
 func Create(conf *Config) (*Gossip, error) {
 	g, err := newGossip(conf)
 	if err != nil {
@@ -37,14 +37,14 @@ func Create(conf *Config) (*Gossip, error) {
 	return g, nil
 }
 
-// Join attempts to join the cluster by syncing with the given seed node
+// Seed attempts to join the cluster by syncing with the given seed node
 // addresses.
 //
 // Note this does not wait for the sync to complete.
 //
 // This may be called multiple times, such as if all known nodes leave and so
 // the node needs to bootstrap again.
-func (g *Gossip) Join(seeds []string) error {
+func (g *Gossip) Seed(seeds []string) error {
 	var errs error
 	for _, addr := range seeds {
 		// Ignore ourselves.
