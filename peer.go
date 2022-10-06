@@ -9,8 +9,8 @@ type peerEntry struct {
 	Value   string
 }
 
-// Peer represents the state of a peer.
-type Peer struct {
+// peer represents the state of a peer.
+type peer struct {
 	peerID string
 	addr   string
 	// version is the highest version of all the peers entries. This is used to
@@ -20,10 +20,10 @@ type Peer struct {
 	entries map[string]peerEntry
 }
 
-// NewPeer returns a new peer with the given ID, with a version of 0 to indicate
+// newPeer returns a new peer with the given ID, with a version of 0 to indicate
 // this hasn't had any updates.
-func NewPeer(peerID string, addr string) *Peer {
-	return &Peer{
+func newPeer(peerID string, addr string) *peer {
+	return &peer{
 		peerID:  peerID,
 		addr:    addr,
 		version: 0,
@@ -31,15 +31,15 @@ func NewPeer(peerID string, addr string) *Peer {
 	}
 }
 
-func (p *Peer) Addr() string {
+func (p *peer) Addr() string {
 	return p.addr
 }
 
-func (p *Peer) Version() uint64 {
+func (p *peer) Version() uint64 {
 	return p.version
 }
 
-func (p *Peer) Lookup(key string) (peerEntry, bool) {
+func (p *peer) Lookup(key string) (peerEntry, bool) {
 	if entry, ok := p.entries[key]; ok {
 		return entry, true
 	}
@@ -50,7 +50,7 @@ func (p *Peer) Lookup(key string) (peerEntry, bool) {
 // increments the peers version so it is propagated around the cluster.
 // If the value is unchanged, the version isn't updated (to avoid propagating
 // redundant data).
-func (p *Peer) UpdateLocal(key string, value string) {
+func (p *peer) UpdateLocal(key string, value string) {
 	if entry, ok := p.entries[key]; ok {
 		if entry.Value == value {
 			return
@@ -67,7 +67,7 @@ func (p *Peer) UpdateLocal(key string, value string) {
 // UpdateRemote updates the peer from an update from a remote node. If the
 // local version of that entry is greater than the new version, the update is
 // discarded.
-func (p *Peer) UpdateRemote(key string, value string, version uint64) {
+func (p *peer) UpdateRemote(key string, value string, version uint64) {
 	// Ignore updates with a smaller version than the current entry.
 	if entry, ok := p.entries[key]; ok {
 		if version <= entry.Version {
@@ -84,8 +84,8 @@ func (p *Peer) UpdateRemote(key string, value string, version uint64) {
 	}
 }
 
-func (p *Peer) Digest() PeerDigest {
-	return PeerDigest{
+func (p *peer) Digest() peerDigest {
+	return peerDigest{
 		Addr:    p.addr,
 		Version: p.version,
 	}
@@ -96,14 +96,14 @@ func (p *Peer) Digest() PeerDigest {
 //
 // Note ordering deltas by version (per peer) is important since the full
 // delta may not be sent - and we can't have gaps in versions.
-func (p *Peer) Deltas(version uint64) PeerDelta {
-	deltas := []DeltaEntry{}
+func (p *peer) Deltas(version uint64) peerDelta {
+	deltas := []deltaEntry{}
 	for key, entry := range p.entries {
 		if entry.Version <= version {
 			continue
 		}
 
-		deltas = append(deltas, DeltaEntry{
+		deltas = append(deltas, deltaEntry{
 			Key:     key,
 			Value:   entry.Value,
 			Version: entry.Version,
@@ -116,7 +116,7 @@ func (p *Peer) Deltas(version uint64) PeerDelta {
 		return deltas[i].Version < deltas[j].Version
 	})
 
-	return PeerDelta{
+	return peerDelta{
 		Addr:   p.addr,
 		Deltas: deltas,
 	}

@@ -12,8 +12,10 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 )
 
+// Gossip handles cluster membership using the scuttlebutt protocol.
+// This is thread safe.
 type Gossip struct {
-	peerMap        *PeerMap
+	peerMap        *peerMap
 	gossipInterval time.Duration
 	transport      Transport
 	done           chan struct{}
@@ -57,6 +59,10 @@ func (g *Gossip) Join(seeds []string) error {
 	return errs
 }
 
+// Lookup looks up the given key in the known state of the peer with the given
+// ID. Since the cluster state is eventually consistent, this isn't guaranteed
+// to be up to date with the actual state of the peer, though should converge
+// quickly.
 func (g *Gossip) Lookup(peerID string, key string) (string, bool) {
 	e, ok := g.peerMap.Lookup(peerID, key)
 	if !ok {
@@ -65,6 +71,8 @@ func (g *Gossip) Lookup(peerID string, key string) (string, bool) {
 	return e.Value, true
 }
 
+// UpdateLocal updates this nodes state with the given key-value pair. This will
+// be propagated to the other nodes in the cluster.
 func (g *Gossip) UpdateLocal(key string, value string) {
 	g.peerMap.UpdateLocal(key, value)
 }
@@ -76,6 +84,8 @@ func (g *Gossip) BindAddr() string {
 	return g.transport.BindAddr()
 }
 
+// Shutdown closes all background networking and stops gossiping its state to
+// the cluster.
 func (g *Gossip) Shutdown() error {
 	// Note must close transport first or could block writing to packetCh.
 	err := g.transport.Shutdown()
@@ -114,13 +124,13 @@ func newGossip(conf *Config) (*Gossip, error) {
 	}
 
 	return &Gossip{
-		peerMap: NewPeerMap(
+		peerMap: newPeerMap(
 			conf.ID,
 			// Note use transport bind addr not configured bind addr as these
 			// may be different if the system assigns the port.
 			transport.BindAddr(),
 			conf.NodeSubscriber,
-			conf.EventSubscriber,
+			conf.StateSubscriber,
 		),
 		gossipInterval: gossipInterval,
 		transport:      transport,
@@ -168,7 +178,7 @@ func (g *Gossip) gossip() {
 }
 
 func (g *Gossip) handleMessage(packet *Packet) {
-	var m Message
+	var m message
 	if err := json.Unmarshal(packet.Buf, &m); err != nil {
 		g.logger.Println("[WARN] scuttlebutt: invalid message received")
 		return
@@ -184,7 +194,7 @@ func (g *Gossip) handleMessage(packet *Packet) {
 	}
 }
 
-func (g *Gossip) handleDigest(digest *Digest, addr string, request bool) {
+func (g *Gossip) handleDigest(digest *digest, addr string, request bool) {
 	// Add any peers we didn't know existed to the peer map.
 	g.peerMap.ApplyDigest(*digest)
 
@@ -205,13 +215,13 @@ func (g *Gossip) handleDigest(digest *Digest, addr string, request bool) {
 	}
 }
 
-func (g *Gossip) handleDelta(delta *Delta) {
+func (g *Gossip) handleDelta(delta *delta) {
 	g.peerMap.ApplyDeltas(*delta)
 }
 
 func (g *Gossip) sendDigest(addr string, request bool) error {
 	digest := g.peerMap.Digest()
-	m := Message{
+	m := message{
 		Type:    "digest",
 		Request: request,
 		Digest:  &digest,
@@ -229,8 +239,8 @@ func (g *Gossip) sendDigest(addr string, request bool) error {
 	return nil
 }
 
-func (g *Gossip) sendDelta(addr string, delta Delta) error {
-	m := Message{
+func (g *Gossip) sendDelta(addr string, delta delta) error {
+	m := message{
 		Type:    "delta",
 		Request: true,
 		Delta:   &delta,

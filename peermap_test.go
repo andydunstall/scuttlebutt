@@ -52,7 +52,7 @@ func (s *fakeEventSubscriber) NotifyUpdate(peerID string, key string, value stri
 }
 
 func TestPeerMap_UpdateLocal(t *testing.T) {
-	pm := NewPeerMap("local-peer", "", nil, nil)
+	pm := newPeerMap("local-peer", "", nil, nil)
 
 	pm.UpdateLocal("foo", "bar")
 	e, ok := pm.Lookup("local-peer", "foo")
@@ -62,25 +62,25 @@ func TestPeerMap_UpdateLocal(t *testing.T) {
 }
 
 func TestPeerMap_Peers(t *testing.T) {
-	pm := NewPeerMap("local-peer", "", nil, nil)
+	pm := newPeerMap("local-peer", "", nil, nil)
 
-	pm.ApplyDeltas(Delta{
-		"peer-1": PeerDelta{
+	pm.ApplyDeltas(delta{
+		"peer-1": peerDelta{
 			Addr: "10.26.104.52:1001",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "a", Value: "1", Version: 12},
 				{Key: "b", Value: "2", Version: 14},
 			},
 		},
-		"peer-3": PeerDelta{
+		"peer-3": peerDelta{
 			Addr: "10.26.104.52:1003",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "c", Value: "3", Version: 15},
 			},
 		},
-		"peer-4": PeerDelta{
+		"peer-4": peerDelta{
 			Addr: "10.26.104.52:1004",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "d", Value: "4", Version: 2},
 			},
 		},
@@ -97,44 +97,44 @@ func TestPeerMap_Peers(t *testing.T) {
 }
 
 func TestPeerMap_Digest(t *testing.T) {
-	pm := NewPeerMap("local-peer", "10.26.104.52:1000", nil, nil)
+	pm := newPeerMap("local-peer", "10.26.104.52:1000", nil, nil)
 
-	pm.ApplyDeltas(Delta{
-		"peer-1": PeerDelta{
+	pm.ApplyDeltas(delta{
+		"peer-1": peerDelta{
 			Addr: "10.26.104.52:1001",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "a", Value: "1", Version: 12},
 				{Key: "b", Value: "2", Version: 14},
 			},
 		},
-		"peer-3": PeerDelta{
+		"peer-3": peerDelta{
 			Addr: "10.26.104.52:1003",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "c", Value: "3", Version: 15},
 			},
 		},
-		"peer-4": PeerDelta{
+		"peer-4": peerDelta{
 			Addr: "10.26.104.52:1004",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "d", Value: "4", Version: 2},
 			},
 		},
 	})
 
-	expected := Digest{
-		"local-peer": PeerDigest{
+	expected := digest{
+		"local-peer": peerDigest{
 			Addr:    "10.26.104.52:1000",
 			Version: 0,
 		},
-		"peer-1": PeerDigest{
+		"peer-1": peerDigest{
 			Addr:    "10.26.104.52:1001",
 			Version: 14,
 		},
-		"peer-3": PeerDigest{
+		"peer-3": peerDigest{
 			Addr:    "10.26.104.52:1003",
 			Version: 15,
 		},
-		"peer-4": PeerDigest{
+		"peer-4": peerDigest{
 			Addr:    "10.26.104.52:1004",
 			Version: 2,
 		},
@@ -145,51 +145,51 @@ func TestPeerMap_Digest(t *testing.T) {
 }
 
 func TestPeerMap_Deltas(t *testing.T) {
-	pm := NewPeerMap("local-peer", "10.26.104.52:1000", nil, nil)
+	pm := newPeerMap("local-peer", "10.26.104.52:1000", nil, nil)
 
-	pm.ApplyDeltas(Delta{
-		"peer-1": PeerDelta{
+	pm.ApplyDeltas(delta{
+		"peer-1": peerDelta{
 			Addr: "10.26.104.52:1001",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "a", Value: "1", Version: 12},
 				{Key: "b", Value: "2", Version: 14},
 			},
 		},
-		"peer-2": PeerDelta{
+		"peer-2": peerDelta{
 			Addr: "10.26.104.52:1002",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "c", Value: "3", Version: 5},
 				{Key: "d", Value: "4", Version: 21},
 			},
 		},
-		"peer-3": PeerDelta{
+		"peer-3": peerDelta{
 			Addr: "10.26.104.52:1003",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "e", Value: "5", Version: 13},
 				{Key: "f", Value: "6", Version: 15},
 			},
 		},
-		"peer-4": PeerDelta{
+		"peer-4": peerDelta{
 			Addr: "10.26.104.52:1004",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "g", Value: "7", Version: 2},
 			},
 		},
 	})
 
-	actual := pm.Deltas(Digest{
+	actual := pm.Deltas(digest{
 		// Version lower than all peer 1's entries.
-		"peer-1": PeerDigest{
+		"peer-1": peerDigest{
 			Addr:    "10.26.104.52:1001",
 			Version: 10,
 		},
 		// Version higher than all peer 2's entries.
-		"peer-2": PeerDigest{
+		"peer-2": peerDigest{
 			Addr:    "10.26.104.52:1002",
 			Version: 33,
 		},
 		// Version higher than half peer 3's entries.
-		"peer-3": PeerDigest{
+		"peer-3": peerDigest{
 			Addr:    "10.26.104.52:1003",
 			Version: 14,
 		},
@@ -197,23 +197,23 @@ func TestPeerMap_Deltas(t *testing.T) {
 		// include all entries.
 	})
 
-	expected := Delta{
-		"peer-1": PeerDelta{
+	expected := delta{
+		"peer-1": peerDelta{
 			Addr: "10.26.104.52:1001",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "a", Value: "1", Version: 12},
 				{Key: "b", Value: "2", Version: 14},
 			},
 		},
-		"peer-3": PeerDelta{
+		"peer-3": peerDelta{
 			Addr: "10.26.104.52:1003",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "f", Value: "6", Version: 15},
 			},
 		},
-		"peer-4": PeerDelta{
+		"peer-4": peerDelta{
 			Addr: "10.26.104.52:1004",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "g", Value: "7", Version: 2},
 			},
 		},
@@ -222,19 +222,19 @@ func TestPeerMap_Deltas(t *testing.T) {
 }
 
 func TestPeerMap_ApplyDigest(t *testing.T) {
-	pm := NewPeerMap("local-peer", "10.26.104.52:1000", nil, nil)
+	pm := newPeerMap("local-peer", "10.26.104.52:1000", nil, nil)
 
 	// Add peers and check the callback is fired.
-	pm.ApplyDigest(Digest{
-		"peer-1": PeerDigest{
+	pm.ApplyDigest(digest{
+		"peer-1": peerDigest{
 			Addr:    "10.26.104.52:1001",
 			Version: 14,
 		},
-		"peer-2": PeerDigest{
+		"peer-2": peerDigest{
 			Addr:    "10.26.104.52:1002",
 			Version: 15,
 		},
-		"peer-3": PeerDigest{
+		"peer-3": peerDigest{
 			Addr:    "10.26.104.52:1003",
 			Version: 2,
 		},
@@ -250,25 +250,25 @@ func TestPeerMap_ApplyDigest(t *testing.T) {
 }
 
 func TestPeerMap_ApplyDeltasUpdateRemote(t *testing.T) {
-	pm := NewPeerMap("local-peer", "", nil, nil)
+	pm := newPeerMap("local-peer", "", nil, nil)
 
-	pm.ApplyDeltas(Delta{
-		"peer-1": PeerDelta{
+	pm.ApplyDeltas(delta{
+		"peer-1": peerDelta{
 			Addr: "10.26.104.52:1001",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "a", Value: "1", Version: 12},
 				{Key: "b", Value: "2", Version: 14},
 			},
 		},
-		"peer-3": PeerDelta{
+		"peer-3": peerDelta{
 			Addr: "10.26.104.52:1003",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "c", Value: "3", Version: 15},
 			},
 		},
-		"peer-4": PeerDelta{
+		"peer-4": peerDelta{
 			Addr: "10.26.104.52:1004",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "d", Value: "4", Version: 2},
 			},
 		},
@@ -298,12 +298,12 @@ func TestPeerMap_ApplyDeltasUpdateRemote(t *testing.T) {
 }
 
 func TestPeerMap_ApplyDeltasIgnoreUpdatesAboutLocalPeer(t *testing.T) {
-	pm := NewPeerMap("local-peer", "10.26.104.52:1000", nil, nil)
+	pm := newPeerMap("local-peer", "10.26.104.52:1000", nil, nil)
 
-	pm.ApplyDeltas(Delta{
-		"local-peer": PeerDelta{
+	pm.ApplyDeltas(delta{
+		"local-peer": peerDelta{
 			Addr: "10.26.104.52:1000",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "foo", Value: "bar", Version: 12},
 			},
 		},
@@ -316,19 +316,19 @@ func TestPeerMap_ApplyDeltasIgnoreUpdatesAboutLocalPeer(t *testing.T) {
 
 func TestPeerMap_SubscribeToNodeJoinedFromDigest(t *testing.T) {
 	sub := NewFakeNodeSubscriber()
-	pm := NewPeerMap("local-peer", "10.26.104.52:1000", sub, nil)
+	pm := newPeerMap("local-peer", "10.26.104.52:1000", sub, nil)
 
 	// Add peers and check the callback is fired.
-	pm.ApplyDigest(Digest{
-		"peer-1": PeerDigest{
+	pm.ApplyDigest(digest{
+		"peer-1": peerDigest{
 			Addr:    "10.26.104.52:1001",
 			Version: 14,
 		},
-		"peer-2": PeerDigest{
+		"peer-2": peerDigest{
 			Addr:    "10.26.104.52:1002",
 			Version: 15,
 		},
-		"peer-3": PeerDigest{
+		"peer-3": peerDigest{
 			Addr:    "10.26.104.52:1003",
 			Version: 2,
 		},
@@ -340,26 +340,26 @@ func TestPeerMap_SubscribeToNodeJoinedFromDigest(t *testing.T) {
 
 func TestPeerMap_SubscribeToNodeJoinedFromDelta(t *testing.T) {
 	sub := NewFakeNodeSubscriber()
-	pm := NewPeerMap("local-peer", "10.26.104.52:1000", sub, nil)
+	pm := newPeerMap("local-peer", "10.26.104.52:1000", sub, nil)
 
 	// Add peers and check the callback is fired.
-	pm.ApplyDeltas(Delta{
-		"peer-1": PeerDelta{
+	pm.ApplyDeltas(delta{
+		"peer-1": peerDelta{
 			Addr: "10.26.104.52:1001",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "a", Value: "1", Version: 12},
 				{Key: "b", Value: "2", Version: 14},
 			},
 		},
-		"peer-2": PeerDelta{
+		"peer-2": peerDelta{
 			Addr: "10.26.104.52:1002",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "c", Value: "3", Version: 15},
 			},
 		},
-		"peer-3": PeerDelta{
+		"peer-3": peerDelta{
 			Addr: "10.26.104.52:1003",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "d", Value: "4", Version: 2},
 			},
 		},
@@ -371,26 +371,26 @@ func TestPeerMap_SubscribeToNodeJoinedFromDelta(t *testing.T) {
 
 func TestPeerMap_SubscribeToPeerUpdated(t *testing.T) {
 	sub := NewFakeEventSubscriber()
-	pm := NewPeerMap("local-peer", "10.26.104.52:1000", nil, sub)
+	pm := newPeerMap("local-peer", "10.26.104.52:1000", nil, sub)
 
 	// Add peers and check the callback is fired.
-	pm.ApplyDeltas(Delta{
-		"peer-1": PeerDelta{
+	pm.ApplyDeltas(delta{
+		"peer-1": peerDelta{
 			Addr: "10.26.104.52:1001",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "a", Value: "1", Version: 12},
 				{Key: "b", Value: "2", Version: 14},
 			},
 		},
-		"peer-2": PeerDelta{
+		"peer-2": peerDelta{
 			Addr: "10.26.104.52:1002",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "c", Value: "3", Version: 15},
 			},
 		},
-		"peer-3": PeerDelta{
+		"peer-3": peerDelta{
 			Addr: "10.26.104.52:1003",
-			Deltas: []DeltaEntry{
+			Deltas: []deltaEntry{
 				{Key: "d", Value: "4", Version: 2},
 			},
 		},

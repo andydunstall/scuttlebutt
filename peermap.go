@@ -4,29 +4,29 @@ import (
 	"sync"
 )
 
-// PeerMap contains this nodes view of all known peers in the cluster.
+// peerMap contains this nodes view of all known peers in the cluster.
 //
 // Note this is thread safe.
-type PeerMap struct {
+type peerMap struct {
 	// peerID is the ID of the local peer.
 	peerID string
 	// peers contains the set of known peers.
-	peers map[string]*Peer
+	peers map[string]*peer
 	// mu protects all above fields. Using a RWMutex since expect the workload to be
 	// quite read heavy (calculating deltas and digests).
 	mu sync.RWMutex
 
 	// Note must not hold mu when notifying a subscriber as it may call back to
-	// PeerMap.
+	// peerMap.
 	nodeSubscriber  NodeSubscriber
-	eventSubscriber EventSubscriber
+	eventSubscriber StateSubscriber
 }
 
-func NewPeerMap(peerID string, peerAddr string, nodeSubscriber NodeSubscriber, eventSubscriber EventSubscriber) *PeerMap {
-	peers := map[string]*Peer{
-		peerID: NewPeer(peerID, peerAddr),
+func newPeerMap(peerID string, peerAddr string, nodeSubscriber NodeSubscriber, eventSubscriber StateSubscriber) *peerMap {
+	peers := map[string]*peer{
+		peerID: newPeer(peerID, peerAddr),
 	}
-	return &PeerMap{
+	return &peerMap{
 		peerID:          peerID,
 		peers:           peers,
 		mu:              sync.RWMutex{},
@@ -37,7 +37,7 @@ func NewPeerMap(peerID string, peerAddr string, nodeSubscriber NodeSubscriber, e
 
 // Peers returns the peer IDs of the peers known by this node (excluding
 // ourselves).
-func (m *PeerMap) Peers() []string {
+func (m *peerMap) Peers() []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -50,7 +50,7 @@ func (m *PeerMap) Peers() []string {
 	return peers
 }
 
-func (m *PeerMap) Lookup(peerID string, key string) (peerEntry, bool) {
+func (m *peerMap) Lookup(peerID string, key string) (peerEntry, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -60,7 +60,7 @@ func (m *PeerMap) Lookup(peerID string, key string) (peerEntry, bool) {
 	return peerEntry{}, false
 }
 
-func (m *PeerMap) Addr(peerID string) (string, bool) {
+func (m *peerMap) Addr(peerID string) (string, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -71,7 +71,7 @@ func (m *PeerMap) Addr(peerID string) (string, bool) {
 }
 
 // UpdateLocal updates an entery in this nodes local peer.
-func (m *PeerMap) UpdateLocal(key string, value string) {
+func (m *peerMap) UpdateLocal(key string, value string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -80,11 +80,11 @@ func (m *PeerMap) UpdateLocal(key string, value string) {
 
 // Digest all known peers and their versions. This is used to check for missing
 // entries when comparing with another nodes state.
-func (m *PeerMap) Digest() Digest {
+func (m *peerMap) Digest() digest {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	digest := Digest{}
+	digest := digest{}
 	for peerID, peer := range m.peers {
 		digest[peerID] = peer.Digest()
 	}
@@ -95,11 +95,11 @@ func (m *PeerMap) Digest() Digest {
 // entry in the digest. A peer we know about that is not in the digest returns
 // all entries for that peer. The deltas are ordered by version per peer as they
 // may be truncated by the transport and we can't have gaps in versions.
-func (m *PeerMap) Deltas(digest Digest) Delta {
+func (m *peerMap) Deltas(digest digest) delta {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	delta := Delta{}
+	delta := delta{}
 	for peerID, peer := range m.peers {
 		entry, ok := digest[peerID]
 		// If we know about a peer that is not in the digest, use a version of
@@ -116,7 +116,7 @@ func (m *PeerMap) Deltas(digest Digest) Delta {
 	return delta
 }
 
-func (m *PeerMap) ApplyDigest(digest Digest) {
+func (m *peerMap) ApplyDigest(digest digest) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -129,13 +129,13 @@ func (m *PeerMap) ApplyDigest(digest Digest) {
 				m.mu.Lock()
 			}
 
-			peer = NewPeer(peerID, peerDigest.Addr)
+			peer = newPeer(peerID, peerDigest.Addr)
 			m.peers[peerID] = peer
 		}
 	}
 }
 
-func (m *PeerMap) ApplyDeltas(delta Delta) {
+func (m *peerMap) ApplyDeltas(delta delta) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -153,7 +153,7 @@ func (m *PeerMap) ApplyDeltas(delta Delta) {
 				m.mu.Lock()
 			}
 
-			peer = NewPeer(peerID, peerDelta.Addr)
+			peer = newPeer(peerID, peerDelta.Addr)
 			m.peers[peerID] = peer
 		}
 

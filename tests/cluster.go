@@ -13,25 +13,25 @@ type peerUpdate struct {
 	Value  string
 }
 
-type ChannelEventSubscriber struct {
+type ChannelStateSubscriber struct {
 	PeerJoinedCh  chan string
 	PeerUpdatedCh chan peerUpdate
 }
 
-func NewChannelEventSubscriber() *ChannelEventSubscriber {
-	return &ChannelEventSubscriber{
+func NewChannelStateSubscriber() *ChannelStateSubscriber {
+	return &ChannelStateSubscriber{
 		PeerJoinedCh:  make(chan string, 64),
 		PeerUpdatedCh: make(chan peerUpdate, 64),
 	}
 }
 
-func (e *ChannelEventSubscriber) NotifyJoin(peerID string) {
+func (e *ChannelStateSubscriber) NotifyJoin(peerID string) {
 	e.PeerJoinedCh <- peerID
 }
 
-func (e *ChannelEventSubscriber) NotifyLeave(peerID string) {}
+func (e *ChannelStateSubscriber) NotifyLeave(peerID string) {}
 
-func (e *ChannelEventSubscriber) NotifyUpdate(peerID string, key string, value string) {
+func (e *ChannelStateSubscriber) NotifyUpdate(peerID string, key string, value string) {
 	e.PeerUpdatedCh <- peerUpdate{
 		PeerID: peerID,
 		Key:    key,
@@ -39,7 +39,7 @@ func (e *ChannelEventSubscriber) NotifyUpdate(peerID string, key string, value s
 	}
 }
 
-func (s *ChannelEventSubscriber) WaitPeerUpdatedWithTimeout(t time.Duration) (peerUpdate, bool) {
+func (s *ChannelStateSubscriber) WaitPeerUpdatedWithTimeout(t time.Duration) (peerUpdate, bool) {
 	select {
 	case update := <-s.PeerUpdatedCh:
 		return update, true
@@ -48,7 +48,7 @@ func (s *ChannelEventSubscriber) WaitPeerUpdatedWithTimeout(t time.Duration) (pe
 	}
 }
 
-func (s *ChannelEventSubscriber) WaitPeerJoinedWithTimeout(t time.Duration) (string, bool) {
+func (s *ChannelStateSubscriber) WaitPeerJoinedWithTimeout(t time.Duration) (string, bool) {
 	select {
 	case peerID := <-s.PeerJoinedCh:
 		return peerID, true
@@ -67,14 +67,14 @@ func NewCluster() *Cluster {
 	}
 }
 
-func (c *Cluster) AddNode(peerID string, nodeSub scuttlebutt.NodeSubscriber, eventSub scuttlebutt.EventSubscriber) (*scuttlebutt.Gossip, error) {
+func (c *Cluster) AddNode(peerID string, nodeSub scuttlebutt.NodeSubscriber, eventSub scuttlebutt.StateSubscriber) (*scuttlebutt.Gossip, error) {
 	conf := &scuttlebutt.Config{
 		ID: peerID,
 		// Use a port of 0 to let the system assigned a free port.
 		BindAddr:        "127.0.0.1:0",
 		GossipInterval:  time.Millisecond * 100,
 		NodeSubscriber:  nodeSub,
-		EventSubscriber: eventSub,
+		StateSubscriber: eventSub,
 	}
 
 	node, err := scuttlebutt.Create(conf)

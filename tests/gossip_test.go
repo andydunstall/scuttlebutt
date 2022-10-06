@@ -11,7 +11,7 @@ func TestGossip_PropagateUpdate(t *testing.T) {
 	cluster := NewCluster()
 	defer cluster.Shutdown()
 
-	sub := NewChannelEventSubscriber()
+	sub := NewChannelStateSubscriber()
 
 	node1, err := cluster.AddNode("node-1", nil, sub)
 	assert.Nil(t, err)
@@ -38,7 +38,7 @@ func TestGossip_PeerDiscovery(t *testing.T) {
 	cluster := NewCluster()
 	defer cluster.Shutdown()
 
-	sub := NewChannelEventSubscriber()
+	sub := NewChannelStateSubscriber()
 
 	node1, err := cluster.AddNode("node-1", sub, nil)
 	assert.Nil(t, err)

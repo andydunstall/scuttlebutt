@@ -1,8 +1,8 @@
 package scuttlebutt
 
-type PeerDigest struct {
+type peerDigest struct {
 	Addr    string `json:"addr,omitempty"`
 	Version uint64 `json:"version,omitempty"`
 }
 
-type Digest map[string]PeerDigest
+type digest map[string]peerDigest

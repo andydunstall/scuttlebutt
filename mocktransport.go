@@ -33,17 +33,17 @@ func (n *MockNetwork) NewTransport() *MockTransport {
 	return transport
 }
 
-// MockAddress is a wrapper which adds the net.Addr interface to our mock
+// mockAddress is a wrapper which adds the net.Addr interface to our mock
 // address scheme.
-type MockAddress struct {
+type mockAddress struct {
 	addr string
 }
 
-func (a *MockAddress) Network() string {
+func (a *mockAddress) Network() string {
 	return "mock"
 }
 
-func (a *MockAddress) String() string {
+func (a *mockAddress) String() string {
 	return a.addr
 }
 
@@ -89,7 +89,7 @@ func (t *MockTransport) getPeer(addr string) (*MockTransport, error) {
 }
 
 func (t *MockTransport) from() net.Addr {
-	return &MockAddress{
+	return &mockAddress{
 		addr: t.bindAddr,
 	}
 }

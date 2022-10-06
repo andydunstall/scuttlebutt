@@ -25,9 +25,9 @@ type Config struct {
 	// the cluster.
 	NodeSubscriber NodeSubscriber
 
-	// EventSubscriber subscribes to events relating to peers state being
+	// StateSubscriber subscribes to events relating to peers state being
 	// updated.
-	EventSubscriber EventSubscriber
+	StateSubscriber StateSubscriber
 
 	// Logger is a custom logger. If not set no logs are output to stderr.
 	Logger *log.Logger

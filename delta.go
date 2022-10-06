@@ -1,14 +1,14 @@
 package scuttlebutt
 
-type DeltaEntry struct {
+type deltaEntry struct {
 	Key     string `json:"key,omitempty"`
 	Value   string `json:"value,omitempty"`
 	Version uint64 `json:"version,omitempty"`
 }
 
-type PeerDelta struct {
+type peerDelta struct {
 	Addr   string       `json:"addr,omitempty"`
-	Deltas []DeltaEntry `json:"deltas,omitempty"`
+	Deltas []deltaEntry `json:"deltas,omitempty"`
 }
 
-type Delta map[string]PeerDelta
+type delta map[string]peerDelta
