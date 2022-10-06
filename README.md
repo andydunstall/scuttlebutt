@@ -89,3 +89,5 @@ extending to match the protocol described in the paper
 - [ ] Add CI
 - [ ] Load test evaluation
 	* Look at reproducing the papers results
+- [ ] Testing
+	* Add chaos testing using fake transport and injecting partitions
