@@ -70,6 +70,22 @@ func (m *peerMap) Addr(peerID string) (string, bool) {
 	return "", false
 }
 
+func (m *peerMap) PeersEqual(o *peerMap) bool {
+	if len(m.peers) != len(o.peers) {
+		return false
+	}
+	for k, v := range m.peers {
+		w, ok := o.peers[k]
+		if !ok {
+			return false
+		}
+		if !v.Equal(w) {
+			return false
+		}
+	}
+	return true
+}
+
 // UpdateLocal updates an entery in this nodes local peer.
 func (m *peerMap) UpdateLocal(key string, value string) {
 	m.mu.Lock()

@@ -1,7 +1,6 @@
 package scuttlebutt
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
@@ -16,6 +15,7 @@ import (
 // This is thread safe.
 type Gossip struct {
 	peerMap        *peerMap
+	protocol       *protocol
 	gossipInterval time.Duration
 	transport      Transport
 	done           chan struct{}
@@ -52,7 +52,7 @@ func (g *Gossip) Seed(seeds []string) error {
 			continue
 		}
 
-		if err := g.sendDigest(addr, true); err != nil {
+		if err := g.sync(addr); err != nil {
 			errs = multierror.Append(errs, err)
 		}
 	}
@@ -123,15 +123,18 @@ func newGossip(conf *Config) (*Gossip, error) {
 		}
 	}
 
+	peerMap := newPeerMap(
+		conf.ID,
+		// Note use transport bind addr not configured bind addr as these
+		// may be different if the system assigns the port.
+		transport.BindAddr(),
+		conf.NodeSubscriber,
+		conf.StateSubscriber,
+	)
+
 	return &Gossip{
-		peerMap: newPeerMap(
-			conf.ID,
-			// Note use transport bind addr not configured bind addr as these
-			// may be different if the system assigns the port.
-			transport.BindAddr(),
-			conf.NodeSubscriber,
-			conf.StateSubscriber,
-		),
+		peerMap:        peerMap,
+		protocol:       newProtocol(peerMap),
 		gossipInterval: gossipInterval,
 		transport:      transport,
 		done:           make(chan struct{}),
@@ -154,7 +157,7 @@ func (g *Gossip) gossipLoop() {
 	for {
 		select {
 		case packet := <-g.transport.PacketCh():
-			g.handleMessage(packet)
+			g.onPacket(packet)
 		case <-ticker.C:
 			g.gossip()
 		case <-g.done:
@@ -174,87 +177,35 @@ func (g *Gossip) gossip() {
 	if !ok {
 		return
 	}
-	g.sendDigest(addr, true)
+	g.sync(addr)
 }
 
-func (g *Gossip) handleMessage(packet *Packet) {
-	var m message
-	if err := json.Unmarshal(packet.Buf, &m); err != nil {
-		g.logger.Println("[WARN] scuttlebutt: invalid message received")
-		return
-	}
-
-	switch m.Type {
-	case "digest":
-		g.handleDigest(m.Digest, packet.From.String(), m.Request)
-	case "delta":
-		g.handleDelta(m.Delta)
-	default:
-		g.logger.Println("[WARN] scuttlebutt: unrecognised message type:", m.Type)
-	}
-}
-
-func (g *Gossip) handleDigest(digest *digest, addr string, request bool) {
-	// Add any peers we didn't know existed to the peer map.
-	g.peerMap.ApplyDigest(*digest)
-
-	delta := g.peerMap.Deltas(*digest)
-	// Only send the delta if it is not empty. Note we don't care about sending
-	// to prove liveness given we send our own digest immediately anyway.
-	if len(delta) > 0 {
-		g.sendDelta(addr, delta)
-	}
-
-	// Only respond with our own digest if the peers digest was a request.
-	// Otherwise we get stuck in a loop sending digests back and forth.
-	//
-	// Note we respond with a digest even if our digests are the same, since
-	// the peer uses the response to check liveness.
-	if request {
-		g.sendDigest(addr, false)
-	}
-}
-
-func (g *Gossip) handleDelta(delta *delta) {
-	g.peerMap.ApplyDeltas(*delta)
-}
-
-func (g *Gossip) sendDigest(addr string, request bool) error {
-	digest := g.peerMap.Digest()
-	m := message{
-		Type:    "digest",
-		Request: request,
-		Digest:  &digest,
-	}
-	b, err := json.Marshal(&m)
+func (g *Gossip) onPacket(p *Packet) {
+	responses, err := g.protocol.OnMessage(p.Buf)
 	if err != nil {
-		g.logger.Println("[WARN] scuttlebutt: failed to encode digest:", err)
-		return fmt.Errorf("failed to encode digest: %v", err)
+		g.logger.Println("[WARN] scuttlebutt:", err)
 	}
+	for _, b := range responses {
+		_, err := g.transport.WriteTo(b, p.From.String())
+		if err != nil {
+			g.logger.Println("[ERR] scuttlebutt: failed to write to transport:", err)
+			return
+		}
+	}
+}
+
+func (g *Gossip) sync(addr string) error {
+	b, err := g.protocol.DigestRequest()
+	if err != nil {
+		g.logger.Println("[ERR] scuttlebutt: failed to get digest request:", err)
+		return err
+	}
+
 	_, err = g.transport.WriteTo(b, addr)
 	if err != nil {
 		g.logger.Println("[ERR] scuttlebutt: failed to write to transport:", err)
 		return fmt.Errorf("failed to write to transport %s: %v", addr, err)
 	}
-	return nil
-}
 
-func (g *Gossip) sendDelta(addr string, delta delta) error {
-	m := message{
-		Type:    "delta",
-		Request: true,
-		Delta:   &delta,
-	}
-
-	b, err := json.Marshal(&m)
-	if err != nil {
-		g.logger.Println("[WARN] scuttlebutt: failed to encode delta:", err)
-		return fmt.Errorf("failed to encode delta: %v", err)
-	}
-
-	if _, err = g.transport.WriteTo(b, addr); err != nil {
-		g.logger.Println("[ERR] scuttlebutt: failed to write to transport:", err)
-		return fmt.Errorf("failed to write to transport %s: %v", addr, err)
-	}
 	return nil
 }

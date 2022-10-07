@@ -46,6 +46,36 @@ func (p *peer) Lookup(key string) (peerEntry, bool) {
 	return peerEntry{}, false
 }
 
+func (p *peer) Equal(o *peer) bool {
+	if p.peerID != o.peerID {
+		return false
+	}
+	if p.addr != o.addr {
+		return false
+	}
+	if p.version != o.version {
+		return false
+	}
+
+	if len(p.entries) != len(o.entries) {
+		return false
+	}
+	for k, v := range p.entries {
+		w, ok := o.entries[k]
+		if !ok {
+			return false
+		}
+		if v.Version != w.Version {
+			return false
+		}
+		if v.Value != w.Value {
+			return false
+		}
+	}
+
+	return true
+}
+
 // UpdateLocal updates the peer when it is owned by the local node. This
 // increments the peers version so it is propagated around the cluster.
 // If the value is unchanged, the version isn't updated (to avoid propagating
