@@ -1,5 +1,4 @@
 # Scuttlebutt
-**In progress:** See TODO below.
 
 A Go library that manages cluster membership and propagates node state using
 the [Scuttlebutt](https://www.cs.cornell.edu/home/rvr/papers/flowgossip.pdf)
@@ -102,24 +101,54 @@ directory so can be run with
 $ go test ./...
 ```
 
-## TODO
-The basic implementation does now work, though is only a simplified version of
-Scuttlebutt so still needs work.
-- [ ] Push/pull
-- [ ] Add configurable initial state to avoid sending an empty node state when
-first joining
-- [ ] Limit digests and deltas size to MTU
-	* When deltas exceeds the MTU - send the deltas with the most entries to
-send the oldest entries first
-- [ ] Protocol: currently only a simplified version of Scuttlebutt, needs
-extending to match the protocol described in the paper
-- [ ] Binary protocol
-- [ ] API docs
-- [ ] Add phi-accrual failure detector
-- [ ] Config
-	* Max entries per delta: used to limit the rate gossips receive entries
-- [ ] Add CI
-- [ ] Load test evaluation
-	* Look at reproducing the papers results
-- [ ] Testing
-	* Add chaos testing using fake transport and injecting partitions
+## Future Improvements
+This is only a fairly simple implementation so far, which is functional though
+theres lots that could be done to improve:
+
+**Limit Messages to MTU**
+
+Currently the protocol uses UDP but has no limits on the packet size. To support
+this:
+* At the moment assume if a peer isn't in a digest, the sender doesn't know
+about that peer, though if we're limiting what can go in the digest this will
+no longer be the case. This should be fine as if the sender doesn't know about
+the peer, it will learn about it when the receiver responds with it's own
+digest (though may require another gossip round)
+* Limit the size of digests to fit in the MTU, either by randomly selecting
+a subset of peers to include, or sending a digest split over multiple messages
+each gossip round
+* Limit the size of the deltas to fit in the MTU, which the paper recommends
+including the most out of date deltas relative to the requested digest (by
+comparing versions)
+
+**Binary Protocol**
+
+At the moment everything is encoded with JSON which is not very efficient. Given
+payloads are quite simple a simple binary protocol that includes a header
+with the message type and a sequence of digest/delta entries should be
+easy and efficient. This will also help limitting messages to the MTU as we
+can just keep adding digests/deltas (ordered by preference) to the message
+until adding another would the limit.
+
+**Configuration**
+
+Adding default configuration would be useful, similar to memberlists `DefaultLAN`
+and `DefaultWAN` config.
+
+Also being able to configure the initial state for the node before it joins the
+cluster.
+
+**Phi-accrual failure detector**
+
+Currently its left to the application to detect failed nodes, though this could
+be done within the library itself.
+
+Similarly theres no way for a node to explicitly leave the cluster.
+
+**Evaluation**
+
+Evaluating how nodes behave under different loads and chaos would be useful,
+and doing some CPU profilings to look for any optimisations.
+
+Could use something like [toxiproxy](https://github.com/Shopify/toxiproxy)
+to inject faults.
