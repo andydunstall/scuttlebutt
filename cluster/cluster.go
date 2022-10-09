@@ -33,6 +33,14 @@ func (n *Node) DiscoveredNode(nodeID string) bool {
 	return false
 }
 
+func (n *Node) ReceivedUpdate(nodeID string, key string, value string) bool {
+	val, ok := n.Gossiper.Lookup(nodeID, key)
+	if ok && val == value {
+		return true
+	}
+	return false
+}
+
 // Cluster manages a local cluster used for testing and evaluation.
 type Cluster struct {
 	nodes map[string]*Node
@@ -125,6 +133,30 @@ func (c *Cluster) WaitToDiscover(ctx context.Context, nodeID string) error {
 		}
 	}
 
+}
+
+// WaitToUpdate waits for all nodes to be notified about the given update.
+func (c *Cluster) WaitToUpdate(ctx context.Context, nodeID string, key string, value string) error {
+	// TODO(AD) for now just poll - later subscribe to each gossip - and
+	// add another subscriber to fire once discovered the given node
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			healthyNodes := 0
+			for _, node := range c.nodes {
+				if node.ReceivedUpdate(nodeID, key, value) {
+					healthyNodes += 1
+				}
+			}
+			if healthyNodes == len(c.nodes) {
+				return nil
+			}
+		}
+	}
 }
 
 func (c *Cluster) seeds(n int) []string {
