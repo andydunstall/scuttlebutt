@@ -59,6 +59,12 @@ func (g *Gossip) Seed(seeds []string) error {
 	return errs
 }
 
+// Peers returns the peer IDs of the peers known by this node (excluding
+// ourselves).
+func (g *Gossip) Peers() []string {
+	return g.peerMap.Peers()
+}
+
 // Lookup looks up the given key in the known state of the peer with the given
 // ID. Since the cluster state is eventually consistent, this isn't guaranteed
 // to be up to date with the actual state of the peer, though should converge
