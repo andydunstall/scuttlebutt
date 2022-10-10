@@ -1,37 +1,53 @@
 package scuttlebutt
 
 import (
-	"encoding/json"
 	"fmt"
 )
 
 type protocol struct {
 	peerMap *peerMap
+	codec   *codec
 }
 
 func newProtocol(peerMap *peerMap) *protocol {
 	return &protocol{
 		peerMap: peerMap,
+		codec:   newCodec(),
 	}
 }
 
 func (p *protocol) DigestRequest() ([]byte, error) {
-	return p.digestMessage(true)
+	digest := p.peerMap.Digest()
+	return p.codec.Encode(typeDigestRequest, &digest)
 }
 
 func (p *protocol) OnMessage(b []byte) ([][]byte, error) {
-	var m message
-	if err := json.Unmarshal(b, &m); err != nil {
-		return nil, fmt.Errorf("failed to decode message: %v", err)
+	mType, err := p.codec.DecodeType(b)
+	if err != nil {
+		return nil, err
 	}
 
-	switch m.Type {
-	case "digest":
-		return p.handleDigest(m.Digest, m.Request)
-	case "delta":
-		return p.handleDelta(m.Delta)
+	switch mType {
+	case typeDigestRequest:
+		var d digest
+		if err = p.codec.Decode(b, &d); err != nil {
+			return nil, err
+		}
+		return p.handleDigest(&d, true)
+	case typeDigestResponse:
+		var d digest
+		if err = p.codec.Decode(b, &d); err != nil {
+			return nil, err
+		}
+		return p.handleDigest(&d, false)
+	case typeDelta:
+		var d delta
+		if err = p.codec.Decode(b, &d); err != nil {
+			return nil, err
+		}
+		return p.handleDelta(&d)
 	default:
-		return nil, fmt.Errorf("unrecognised message type: %s", m.Type)
+		return nil, fmt.Errorf("unrecognised message type: %v", mType)
 	}
 }
 
@@ -78,34 +94,10 @@ func (p *protocol) handleDelta(delta *delta) ([][]byte, error) {
 }
 
 func (p *protocol) deltaResponse(delta *delta) ([]byte, error) {
-	m := message{
-		Type:    "delta",
-		Request: true,
-		Delta:   delta,
-	}
-
-	b, err := json.Marshal(&m)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode delta: %v", err)
-	}
-
-	return b, nil
+	return p.codec.Encode(typeDelta, delta)
 }
 
 func (p *protocol) digestResponse() ([]byte, error) {
-	return p.digestMessage(false)
-}
-
-func (p *protocol) digestMessage(request bool) ([]byte, error) {
 	digest := p.peerMap.Digest()
-	m := message{
-		Type:    "digest",
-		Request: request,
-		Digest:  &digest,
-	}
-	b, err := json.Marshal(&m)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode digest: %v", err)
-	}
-	return b, nil
+	return p.codec.Encode(typeDigestResponse, &digest)
 }
