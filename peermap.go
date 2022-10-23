@@ -2,6 +2,8 @@ package scuttlebutt
 
 import (
 	"sync"
+
+	"go.uber.org/zap"
 )
 
 // peerMap contains this nodes view of all known peers in the cluster.
@@ -16,13 +18,21 @@ type peerMap struct {
 	// quite read heavy (calculating deltas and digests).
 	mu sync.RWMutex
 
+	logger *zap.Logger
+
 	// Note must not hold mu when notifying a subscriber as it may call back to
 	// peerMap.
 	nodeSubscriber  NodeSubscriber
 	eventSubscriber StateSubscriber
 }
 
-func newPeerMap(peerID string, peerAddr string, nodeSubscriber NodeSubscriber, eventSubscriber StateSubscriber) *peerMap {
+func newPeerMap(
+	peerID string,
+	peerAddr string,
+	nodeSubscriber NodeSubscriber,
+	eventSubscriber StateSubscriber,
+	logger *zap.Logger,
+) *peerMap {
 	peers := map[string]*peer{
 		peerID: newPeer(peerID, peerAddr),
 	}
@@ -32,6 +42,7 @@ func newPeerMap(peerID string, peerAddr string, nodeSubscriber NodeSubscriber, e
 		mu:              sync.RWMutex{},
 		nodeSubscriber:  nodeSubscriber,
 		eventSubscriber: eventSubscriber,
+		logger:          logger,
 	}
 }
 
@@ -91,6 +102,8 @@ func (m *peerMap) UpdateLocal(key string, value string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.logger.Debug("update local", zap.String("key", key), zap.String("value", value))
+
 	m.peers[m.peerID].UpdateLocal(key, value)
 }
 
@@ -136,9 +149,16 @@ func (m *peerMap) ApplyDigest(digest digest) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.logger.Debug(
+		"apply digest",
+		zap.Object("digest", digest),
+	)
+
 	for peerID, peerDigest := range digest {
 		peer, ok := m.peers[peerID]
 		if !ok {
+			m.logger.Info("node joined", zap.String("joined", peerID))
+
 			if m.nodeSubscriber != nil {
 				m.mu.Unlock()
 				m.nodeSubscriber.NotifyJoin(peerID)
@@ -155,9 +175,15 @@ func (m *peerMap) ApplyDeltas(delta delta) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.logger.Debug(
+		"apply delta",
+		zap.Object("delta", delta),
+	)
+
 	for peerID, peerDelta := range delta {
 		// Ignore updates about our own peer.
 		if peerID == m.peerID {
+			m.logger.Error("received delta update about local peer")
 			return
 		}
 
@@ -174,6 +200,13 @@ func (m *peerMap) ApplyDeltas(delta delta) {
 		}
 
 		for _, entry := range peerDelta.Deltas {
+			m.logger.Debug(
+				"update remote",
+				zap.String("key", entry.Key),
+				zap.String("value", entry.Value),
+				zap.Uint64("version", entry.Version),
+			)
+
 			peer.UpdateRemote(entry.Key, entry.Value, entry.Version)
 
 			if m.eventSubscriber != nil {

@@ -2,11 +2,12 @@ package scuttlebutt
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 const (
@@ -21,11 +22,11 @@ type UDPTransport struct {
 	packetCh    chan *Packet
 	wg          sync.WaitGroup
 	shutdown    int32
-	logger      *log.Logger
+	logger      *zap.Logger
 }
 
 // NewUDPTransport returns a new UDP transport listening on the given addr.
-func NewUDPTransport(bindAddr string, logger *log.Logger) (Transport, error) {
+func NewUDPTransport(bindAddr string, logger *zap.Logger) (Transport, error) {
 	udpListener, err := udpListen(bindAddr)
 	if err != nil {
 		return nil, err
@@ -94,15 +95,14 @@ func (t *UDPTransport) udpReadLoop(lis *net.UDPConn) {
 				break
 			}
 
-			t.logger.Printf("[ERR] scuttlebutt: Error reading UDP packet: %v", err)
+			t.logger.Error("failed to read from transport", zap.Error(err))
 			continue
 		}
 
 		// Check the length - it needs to have at least one byte to be a
 		// proper message.
 		if n < 1 {
-			t.logger.Printf("[ERR] scuttlebutt: UDP packet too short (%d bytes) %s",
-				len(buf), addr.String())
+			t.logger.Error("8eceived packet too small")
 			continue
 		}
 

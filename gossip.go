@@ -2,13 +2,12 @@ package scuttlebutt
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
-	"os"
 	"sync"
 	"time"
 
 	multierror "github.com/hashicorp/go-multierror"
+	"go.uber.org/zap"
 )
 
 // Gossip handles cluster membership using the scuttlebutt protocol.
@@ -20,7 +19,7 @@ type Gossip struct {
 	transport      Transport
 	done           chan struct{}
 	wg             sync.WaitGroup
-	logger         *log.Logger
+	logger         *zap.Logger
 }
 
 // Create will create a new Gossip using the given configuration.
@@ -45,6 +44,8 @@ func Create(conf *Config) (*Gossip, error) {
 // This may be called multiple times, such as if all known nodes leave and so
 // the node needs to bootstrap again.
 func (g *Gossip) Seed(seeds []string) error {
+	g.logger.Debug("seeding gossiper", zap.Strings("seeds", seeds))
+
 	var errs error
 	for _, addr := range seeds {
 		// Ignore ourselves.
@@ -93,6 +94,8 @@ func (g *Gossip) BindAddr() string {
 // Shutdown closes all background networking and stops gossiping its state to
 // the cluster.
 func (g *Gossip) Shutdown() error {
+	g.logger.Debug("shutdown")
+
 	// Note must close transport first or could block writing to packetCh.
 	err := g.transport.Shutdown()
 	close(g.done)
@@ -101,11 +104,18 @@ func (g *Gossip) Shutdown() error {
 }
 
 func newGossip(conf *Config) (*Gossip, error) {
+	logger := conf.Logger
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+
 	if conf.ID == "" {
+		logger.Error("config missing a node ID")
 		return nil, fmt.Errorf("config missing a node ID")
 	}
 
 	if conf.BindAddr == "" {
+		logger.Error("config missing a bind addr")
 		return nil, fmt.Errorf("config missing a bind addr")
 	}
 
@@ -115,19 +125,17 @@ func newGossip(conf *Config) (*Gossip, error) {
 		gossipInterval = time.Millisecond * 500
 	}
 
-	logger := conf.Logger
-	if logger == nil {
-		logger = log.New(os.Stderr, "", log.LstdFlags)
-	}
-
 	transport := conf.Transport
 	if transport == nil {
 		var err error
 		transport, err = NewUDPTransport(conf.BindAddr, logger)
 		if err != nil {
+			logger.Error("failed to start transport", zap.Error(err))
 			return nil, err
 		}
 	}
+
+	logger.Debug("transport started", zap.String("addr", transport.BindAddr()))
 
 	peerMap := newPeerMap(
 		conf.ID,
@@ -136,11 +144,12 @@ func newGossip(conf *Config) (*Gossip, error) {
 		transport.BindAddr(),
 		conf.NodeSubscriber,
 		conf.StateSubscriber,
+		logger,
 	)
 
 	return &Gossip{
 		peerMap:        peerMap,
-		protocol:       newProtocol(peerMap),
+		protocol:       newProtocol(peerMap, logger),
 		gossipInterval: gossipInterval,
 		transport:      transport,
 		done:           make(chan struct{}),
@@ -179,6 +188,7 @@ func (g *Gossip) gossip() {
 
 	peers := g.peerMap.Peers()
 	peer := peers[rand.Intn(len(peers))]
+	g.logger.Debug("gossip with peer", zap.String("id", peer))
 	addr, ok := g.peerMap.Addr(peer)
 	if !ok {
 		return
@@ -189,27 +199,29 @@ func (g *Gossip) gossip() {
 func (g *Gossip) onPacket(p *Packet) {
 	responses, err := g.protocol.OnMessage(p.Buf)
 	if err != nil {
-		g.logger.Println("[WARN] scuttlebutt:", err)
+		return
 	}
 	for _, b := range responses {
 		_, err := g.transport.WriteTo(b, p.From.String())
 		if err != nil {
-			g.logger.Println("[ERR] scuttlebutt: failed to write to transport:", err)
+			g.logger.Error("failed to write to transport", zap.Error(err))
 			return
 		}
 	}
 }
 
 func (g *Gossip) sync(addr string) error {
+	g.logger.Debug("sync with peer", zap.String("addr", addr))
+
 	b, err := g.protocol.DigestRequest()
 	if err != nil {
-		g.logger.Println("[ERR] scuttlebutt: failed to get digest request:", err)
+		g.logger.Error("failed to get digest reqeust", zap.Error(err))
 		return err
 	}
 
 	_, err = g.transport.WriteTo(b, addr)
 	if err != nil {
-		g.logger.Println("[ERR] scuttlebutt: failed to write to transport:", err)
+		g.logger.Error("failed to write to transport", zap.Error(err))
 		return fmt.Errorf("failed to write to transport %s: %v", addr, err)
 	}
 

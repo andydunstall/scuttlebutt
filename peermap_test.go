@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
 type fakeNodeSubscriber struct {
@@ -52,7 +53,7 @@ func (s *fakeEventSubscriber) NotifyUpdate(peerID string, key string, value stri
 }
 
 func TestPeerMap_UpdateLocal(t *testing.T) {
-	pm := newPeerMap("local-peer", "", nil, nil)
+	pm := newPeerMap("local-peer", "", nil, nil, zap.NewNop())
 
 	pm.UpdateLocal("foo", "bar")
 	e, ok := pm.Lookup("local-peer", "foo")
@@ -62,7 +63,7 @@ func TestPeerMap_UpdateLocal(t *testing.T) {
 }
 
 func TestPeerMap_Peers(t *testing.T) {
-	pm := newPeerMap("local-peer", "", nil, nil)
+	pm := newPeerMap("local-peer", "", nil, nil, zap.NewNop())
 
 	pm.ApplyDeltas(delta{
 		"peer-1": peerDelta{
@@ -97,7 +98,7 @@ func TestPeerMap_Peers(t *testing.T) {
 }
 
 func TestPeerMap_Digest(t *testing.T) {
-	pm := newPeerMap("local-peer", "10.26.104.52:1000", nil, nil)
+	pm := newPeerMap("local-peer", "10.26.104.52:1000", nil, nil, zap.NewNop())
 
 	pm.ApplyDeltas(delta{
 		"peer-1": peerDelta{
@@ -145,7 +146,7 @@ func TestPeerMap_Digest(t *testing.T) {
 }
 
 func TestPeerMap_Deltas(t *testing.T) {
-	pm := newPeerMap("local-peer", "10.26.104.52:1000", nil, nil)
+	pm := newPeerMap("local-peer", "10.26.104.52:1000", nil, nil, zap.NewNop())
 
 	pm.ApplyDeltas(delta{
 		"peer-1": peerDelta{
@@ -222,7 +223,7 @@ func TestPeerMap_Deltas(t *testing.T) {
 }
 
 func TestPeerMap_ApplyDigest(t *testing.T) {
-	pm := newPeerMap("local-peer", "10.26.104.52:1000", nil, nil)
+	pm := newPeerMap("local-peer", "10.26.104.52:1000", nil, nil, zap.NewNop())
 
 	// Add peers and check the callback is fired.
 	pm.ApplyDigest(digest{
@@ -250,7 +251,7 @@ func TestPeerMap_ApplyDigest(t *testing.T) {
 }
 
 func TestPeerMap_ApplyDeltasUpdateRemote(t *testing.T) {
-	pm := newPeerMap("local-peer", "", nil, nil)
+	pm := newPeerMap("local-peer", "", nil, nil, zap.NewNop())
 
 	pm.ApplyDeltas(delta{
 		"peer-1": peerDelta{
@@ -298,7 +299,7 @@ func TestPeerMap_ApplyDeltasUpdateRemote(t *testing.T) {
 }
 
 func TestPeerMap_ApplyDeltasIgnoreUpdatesAboutLocalPeer(t *testing.T) {
-	pm := newPeerMap("local-peer", "10.26.104.52:1000", nil, nil)
+	pm := newPeerMap("local-peer", "10.26.104.52:1000", nil, nil, zap.NewNop())
 
 	pm.ApplyDeltas(delta{
 		"local-peer": peerDelta{
@@ -316,7 +317,7 @@ func TestPeerMap_ApplyDeltasIgnoreUpdatesAboutLocalPeer(t *testing.T) {
 
 func TestPeerMap_SubscribeToNodeJoinedFromDigest(t *testing.T) {
 	sub := NewFakeNodeSubscriber()
-	pm := newPeerMap("local-peer", "10.26.104.52:1000", sub, nil)
+	pm := newPeerMap("local-peer", "10.26.104.52:1000", sub, nil, zap.NewNop())
 
 	// Add peers and check the callback is fired.
 	pm.ApplyDigest(digest{
@@ -340,7 +341,7 @@ func TestPeerMap_SubscribeToNodeJoinedFromDigest(t *testing.T) {
 
 func TestPeerMap_SubscribeToNodeJoinedFromDelta(t *testing.T) {
 	sub := NewFakeNodeSubscriber()
-	pm := newPeerMap("local-peer", "10.26.104.52:1000", sub, nil)
+	pm := newPeerMap("local-peer", "10.26.104.52:1000", sub, nil, zap.NewNop())
 
 	// Add peers and check the callback is fired.
 	pm.ApplyDeltas(delta{
@@ -371,7 +372,7 @@ func TestPeerMap_SubscribeToNodeJoinedFromDelta(t *testing.T) {
 
 func TestPeerMap_SubscribeToPeerUpdated(t *testing.T) {
 	sub := NewFakeEventSubscriber()
-	pm := newPeerMap("local-peer", "10.26.104.52:1000", nil, sub)
+	pm := newPeerMap("local-peer", "10.26.104.52:1000", nil, sub, zap.NewNop())
 
 	// Add peers and check the callback is fired.
 	pm.ApplyDeltas(delta{

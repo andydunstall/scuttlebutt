@@ -31,6 +31,10 @@ func newPeer(peerID string, addr string) *peer {
 	}
 }
 
+func (p *peer) ID() string {
+	return p.peerID
+}
+
 func (p *peer) Addr() string {
 	return p.addr
 }

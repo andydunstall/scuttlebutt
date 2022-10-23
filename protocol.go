@@ -2,17 +2,21 @@ package scuttlebutt
 
 import (
 	"fmt"
+
+	"go.uber.org/zap"
 )
 
 type protocol struct {
 	peerMap *peerMap
 	codec   *codec
+	logger  *zap.Logger
 }
 
-func newProtocol(peerMap *peerMap) *protocol {
+func newProtocol(peerMap *peerMap, logger *zap.Logger) *protocol {
 	return &protocol{
 		peerMap: peerMap,
 		codec:   newCodec(),
+		logger:  logger,
 	}
 }
 
@@ -31,22 +35,26 @@ func (p *protocol) OnMessage(b []byte) ([][]byte, error) {
 	case typeDigestRequest:
 		var d digest
 		if err = p.codec.Decode(b, &d); err != nil {
+			p.logger.Error("invalid digest request", zap.Error(err))
 			return nil, err
 		}
 		return p.handleDigest(&d, true)
 	case typeDigestResponse:
 		var d digest
 		if err = p.codec.Decode(b, &d); err != nil {
+			p.logger.Error("invalid digest response", zap.Error(err))
 			return nil, err
 		}
 		return p.handleDigest(&d, false)
 	case typeDelta:
 		var d delta
 		if err = p.codec.Decode(b, &d); err != nil {
+			p.logger.Error("invalid delta response", zap.Error(err))
 			return nil, err
 		}
 		return p.handleDelta(&d)
 	default:
+		p.logger.Error("unrecognised message type", zap.Uint8("type", uint8(mType)))
 		return nil, fmt.Errorf("unrecognised message type: %v", mType)
 	}
 }

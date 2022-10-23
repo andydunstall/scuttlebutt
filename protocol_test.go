@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
 type fakePeer struct {
@@ -14,12 +15,12 @@ type fakePeer struct {
 }
 
 func newFakePeer(id string, addr string) *fakePeer {
-	peerMap := newPeerMap(id, addr, nil, nil)
+	peerMap := newPeerMap(id, addr, nil, nil, zap.NewNop())
 	return &fakePeer{
 		ID:       id,
 		Addr:     addr,
 		PeerMap:  peerMap,
-		Protocol: newProtocol(peerMap),
+		Protocol: newProtocol(peerMap, zap.NewNop()),
 	}
 }
 

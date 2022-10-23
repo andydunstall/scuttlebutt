@@ -1,8 +1,9 @@
 package scuttlebutt
 
 import (
-	"log"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -29,6 +30,5 @@ type Config struct {
 	// updated.
 	StateSubscriber StateSubscriber
 
-	// Logger is a custom logger. If not set no logs are output to stderr.
-	Logger *log.Logger
+	Logger *zap.Logger
 }

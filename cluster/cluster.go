@@ -8,6 +8,7 @@ import (
 	"github.com/andydunstall/scuttlebutt"
 	"github.com/google/uuid"
 	multierror "github.com/hashicorp/go-multierror"
+	"go.uber.org/zap"
 )
 
 type Node struct {
@@ -53,12 +54,15 @@ func NewCluster() *Cluster {
 }
 
 func (c *Cluster) AddNode() (*Node, error) {
-	id := uuid.New().String()
+	id := uuid.New().String()[:7]
+	logger, _ := zap.NewDevelopment()
+	logger = logger.With(zap.String("peer-id", id))
 	conf := &scuttlebutt.Config{
 		ID: id,
 		// Use a port of 0 to let the system assigned a free port.
 		BindAddr:       "127.0.0.1:0",
 		GossipInterval: time.Millisecond * 100,
+		Logger:         logger,
 	}
 	gossiper, err := scuttlebutt.Create(conf)
 	if err != nil {
