@@ -15,6 +15,7 @@ import (
 type Gossip struct {
 	peerMap        *peerMap
 	protocol       *protocol
+	seeds          []string
 	gossipInterval time.Duration
 	transport      Transport
 	done           chan struct{}
@@ -46,7 +47,10 @@ func Create(conf *Config) (*Gossip, error) {
 func (g *Gossip) Seed(seeds []string) error {
 	g.logger.Debug("seeding gossiper", zap.Strings("seeds", seeds))
 
+	g.seeds = seeds
+
 	var errs error
+	// Immediately try all seeds.
 	for _, addr := range seeds {
 		// Ignore ourselves.
 		if addr == g.BindAddr() {
@@ -150,6 +154,7 @@ func newGossip(conf *Config) (*Gossip, error) {
 	return &Gossip{
 		peerMap:        peerMap,
 		protocol:       newProtocol(peerMap, logger),
+		seeds:          []string{},
 		gossipInterval: gossipInterval,
 		transport:      transport,
 		done:           make(chan struct{}),
@@ -183,6 +188,10 @@ func (g *Gossip) gossipLoop() {
 
 func (g *Gossip) gossip() {
 	if len(g.peerMap.Peers()) == 0 {
+		// If we have seeds but no peers try and seed again.
+		if len(g.seeds) != 0 {
+			g.Seed(g.seeds)
+		}
 		return
 	}
 
