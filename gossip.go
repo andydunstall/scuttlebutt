@@ -146,8 +146,9 @@ func newGossip(conf *Config) (*Gossip, error) {
 		// Note use transport bind addr not configured bind addr as these
 		// may be different if the system assigns the port.
 		transport.BindAddr(),
-		conf.NodeSubscriber,
-		conf.StateSubscriber,
+		conf.OnJoin,
+		conf.OnLeave,
+		conf.OnUpdate,
 		logger,
 	)
 

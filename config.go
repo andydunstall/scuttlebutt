@@ -22,13 +22,14 @@ type Config struct {
 	// If not set defaults to 500ms.
 	GossipInterval time.Duration
 
-	// NodeSubscriber subscribes to events relating to nodes joining and leaving
-	// the cluster.
-	NodeSubscriber NodeSubscriber
+	// OnJoin is invoked when a peer joins the cluster.
+	OnJoin func(peerID string)
 
-	// StateSubscriber subscribes to events relating to peers state being
-	// updated.
-	StateSubscriber StateSubscriber
+	// OnLeave is invoked when a peer joins the cluster.
+	OnLeave func(peerID string)
+
+	// OnUpdate is invoked when a peers state is updated.
+	OnUpdate func(peerID string, key string, value string)
 
 	Logger *zap.Logger
 }

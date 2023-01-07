@@ -15,7 +15,7 @@ type fakePeer struct {
 }
 
 func newFakePeer(id string, addr string) *fakePeer {
-	peerMap := newPeerMap(id, addr, nil, nil, zap.NewNop())
+	peerMap := newPeerMap(id, addr, nil, nil, nil, zap.NewNop())
 	return &fakePeer{
 		ID:       id,
 		Addr:     addr,

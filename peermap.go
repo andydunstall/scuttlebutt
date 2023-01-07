@@ -20,29 +20,32 @@ type peerMap struct {
 
 	logger *zap.Logger
 
-	// Note must not hold mu when notifying a subscriber as it may call back to
+	// Note must not hold mu when invoking callback as it may call back to
 	// peerMap.
-	nodeSubscriber  NodeSubscriber
-	eventSubscriber StateSubscriber
+	onJoin   func(peerID string)
+	onLeave  func(peerID string)
+	onUpdate func(peerID string, key string, value string)
 }
 
 func newPeerMap(
 	peerID string,
 	peerAddr string,
-	nodeSubscriber NodeSubscriber,
-	eventSubscriber StateSubscriber,
+	onJoin func(peerID string),
+	onLeave func(peerID string),
+	onUpdate func(peerID string, key string, value string),
 	logger *zap.Logger,
 ) *peerMap {
 	peers := map[string]*peer{
 		peerID: newPeer(peerID, peerAddr),
 	}
 	return &peerMap{
-		peerID:          peerID,
-		peers:           peers,
-		mu:              sync.RWMutex{},
-		nodeSubscriber:  nodeSubscriber,
-		eventSubscriber: eventSubscriber,
-		logger:          logger,
+		peerID:   peerID,
+		peers:    peers,
+		mu:       sync.RWMutex{},
+		onJoin:   onJoin,
+		onLeave:  onLeave,
+		onUpdate: onUpdate,
+		logger:   logger,
 	}
 }
 
@@ -159,9 +162,9 @@ func (m *peerMap) ApplyDigest(digest digest) {
 		if !ok {
 			m.logger.Info("node joined", zap.String("joined", peerID))
 
-			if m.nodeSubscriber != nil {
+			if m.onJoin != nil {
 				m.mu.Unlock()
-				m.nodeSubscriber.NotifyJoin(peerID)
+				m.onJoin(peerID)
 				m.mu.Lock()
 			}
 
@@ -189,9 +192,9 @@ func (m *peerMap) ApplyDeltas(delta delta) {
 
 		peer, ok := m.peers[peerID]
 		if !ok {
-			if m.nodeSubscriber != nil {
+			if m.onJoin != nil {
 				m.mu.Unlock()
-				m.nodeSubscriber.NotifyJoin(peerID)
+				m.onJoin(peerID)
 				m.mu.Lock()
 			}
 
@@ -209,9 +212,9 @@ func (m *peerMap) ApplyDeltas(delta delta) {
 
 			peer.UpdateRemote(entry.Key, entry.Value, entry.Version)
 
-			if m.eventSubscriber != nil {
+			if m.onUpdate != nil {
 				m.mu.Unlock()
-				m.eventSubscriber.NotifyUpdate(peerID, entry.Key, entry.Value)
+				m.onUpdate(peerID, entry.Key, entry.Value)
 				m.mu.Lock()
 			}
 		}
