@@ -5,69 +5,78 @@ the [Scuttlebutt](https://www.cs.cornell.edu/home/rvr/papers/flowgossip.pdf)
 protocol.
 
 Scuttlebutt is an eventually consistent anti-entropy protocol based on gossip,
-described in the paper [here](https://www.cs.cornell.edu/home/rvr/papers/flowgossip.pdf).
+described in [this paper](https://www.cs.cornell.edu/home/rvr/papers/flowgossip.pdf).
 
-The state of each node is simply a set of arbitrary key-value pairs, so its
-upto the application what state is needed. Such as it may include the node
-type, the nodes current state and any networking information needed to route
-to the node.
+The state of each node is simply a set of arbitrary key-value pairs, so the
+application sets the state. Such as it may include the node type, the nodes
+current status and any networking information needed to route to the node.
 
-Each nodes state is propagated to all other nodes in the cluster, so each node
-builds an eventually consistent store containing its known state about each
-other node. The application can subscribe to updates and lookup key-value
-pairs for a given node.
+Each nodes state is propagated to all other nodes in the cluster, so a node
+builds an eventually consistent view of the cluster. This state is exposed
+as a key-value store on each node, though typically apps will subscribe to
+updates about nodes joining, leaving and updating their state.
+
+**Note** this does not currently support detecting nodes leaving the cluster.
+Working on adding a [Phi Accrual Failure Detector](https://www.computer.org/csdl/proceedings-article/srds/2004/22390066/12OmNvT2phv)
+similar to Cassandra to detect failed nodes. Though even with the failure
+detector, apps may choose to also explicitly signal to other nodes that a node
+is leaving though the nodes state.
 
 ## Usage
 The full API docs can be viewed with `go doc --all`.
 
-**Create a gossip node**
-
+### Create a gossip node
 Creates a new node, which will start listening for updates from nodes in the
 cluster. Since it does not yet know about any other nodes, it will not join
 the cluster unless contacted by another node.
 
 ```go
 node := scuttlebutt.Create(&scuttlebutt.Config{
-	ID: "node-1",
-	BindAddr: "0.0.0.0:8119",
-	// Subscribe to events about nodes joining and leaving.
-	NodeSubscriber: mySubscriber,
-	// Subscribe to state updates from other nodes.
-	StateSubscriber: mySubscriber,
+	ID: "773dc6df",
+	BindAddr: "0.0.0.0:8229",
+	// Receive events about nodes joining, leaving and updating.
+	OnJoin: func(peerID string) {
+		fmt.Println("Node joined", peerID)
+	},
+	OnLeave: func(peerID string) {
+		fmt.Println("Node joined", peerID)
+	},
+	OnUpdate: func(peerID string, key string, value string) {
+		fmt.Println("Node updated", peerID, key, value)
+	}
 })
 ```
 
-**Join the cluster**
-
+### Seed the node
 To join the cluster we must tell the node the address of at least one other
 node in the cluster. Once it syncs with these nodes it will learn about other
 nodes in the cluster and contact them directly in the future.
+
+This may be seeded multiple times.
 
 ```go
 node.Seed([]string{"10.26.104.52:9992", "10.26.104.56:7331"})
 ```
 
-**Update our nodes state**
-
+### Update our nodes state
 Updates our nodes local state, which will be propagated to other nodes in the
 cluster and notify their subscribes of the update.
 
 ```go
-node.UpdateLocal("rpcAddr", "10.25.104.42:5112")
+node.UpdateLocal("routing.addr", "10.25.104.42:5112")
 node.UpdateLocal("state", "ready")
 ```
 
-**Lookup the known state of another node**
-
+### Lookup the known state of another node
 Looks up the state of the peer as known by this node. Since the cluster
 membership is eventually consistent this may be out of date with the actual
 peer, though should converge quickly.
 
-Note typically you'll subscribe to updates with `Config.StateSubscriber`
-rather than querying directly.
+Note typically you'll subscribe to updates with `OnUpdate` rather than querying
+directly.
 
 ```go
-addr, ok := node.Lookup("peer-2", "rpcAddr")
+addr, ok := node.Lookup("9a023689", "routing.addr")
 if !ok {
 	// ...
 }
@@ -101,12 +110,16 @@ directory so can be run with
 $ go test ./...
 ```
 
+### Evaluation
+Theres a CLI tool in `eval/` that can be used to evaluate the cluster. Such
+as the time it takes to propagate an update to all nodes in a cluster with
+64 nodes.
+
 ## Future Improvements
 This is only a fairly simple implementation so far, which is functional though
 theres lots that could be done to improve:
 
-**Limit Messages to MTU**
-
+### Limit Messages to MTU
 Currently the protocol uses UDP but has no limits on the packet size. To support
 this:
 * At the moment assume if a peer isn't in a digest, the sender doesn't know
@@ -121,32 +134,30 @@ each gossip round
 including the most out of date deltas relative to the requested digest (by
 comparing versions)
 
-**Binary Protocol**
+### Binary Protocol
+At the moment everything is encoded with JSON which is not very efficient (both
+in time to encode and space). Given payloads are quite simple a binary protocol
+that includes a header with the message type and a sequence of digest/delta
+entries should be easy and efficient.
 
-At the moment everything is encoded with JSON which is not very efficient. Given
-payloads are quite simple a simple binary protocol that includes a header
-with the message type and a sequence of digest/delta entries should be
-easy and efficient. This will also help limitting messages to the MTU as we
-can just keep adding digests/deltas (ordered by preference) to the message
-until adding another would the limit.
+This will also help limitting messages to the MTU as we can just keep adding
+digests/deltas (ordered by preference) to the message until adding another would
+exceed the limit.
 
-**Configuration**
-
+### Configuration
 Adding default configuration would be useful, similar to memberlists `DefaultLAN`
 and `DefaultWAN` config.
 
 Also being able to configure the initial state for the node before it joins the
 cluster.
 
-**Phi-accrual failure detector**
-
+### Phi-accrual failure detector
 Currently its left to the application to detect failed nodes, though this could
 be done within the library itself.
 
 Similarly theres no way for a node to explicitly leave the cluster.
 
-**Evaluation**
-
+### Evaluation
 Evaluating how nodes behave under different loads and chaos would be useful,
 and doing some CPU profilings to look for any optimisations.
 
