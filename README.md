@@ -7,14 +7,16 @@ protocol.
 Scuttlebutt is an eventually consistent anti-entropy protocol based on gossip,
 described in [this paper](https://www.cs.cornell.edu/home/rvr/papers/flowgossip.pdf).
 
-The state of each node is simply a set of arbitrary key-value pairs, so the
-application sets the state. Such as it may include the node type, the nodes
-current status and any networking information needed to route to the node.
+The state of each node is simply a set of arbitrary key-value pairs set by the
+application. Such as it may include the node type, the node status and routing
+information for the node.
 
 Each nodes state is propagated to all other nodes in the cluster, so a node
 builds an eventually consistent view of the cluster. This state is exposed
 as a key-value store on each node, though typically apps will subscribe to
 updates about nodes joining, leaving and updating their state.
+
+The implementation is described in [docs/scuttlebutt.md](docs/scuttlebutt.md).
 
 **Note** this does not currently support detecting nodes leaving the cluster.
 Working on adding a [Phi Accrual Failure Detector](https://www.computer.org/csdl/proceedings-article/srds/2004/22390066/12OmNvT2phv)
