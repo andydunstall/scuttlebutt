@@ -57,17 +57,16 @@ func (c *Cluster) AddNode() (*Node, error) {
 	id := uuid.New().String()[:7]
 	logger, _ := zap.NewDevelopment()
 	logger = logger.With(zap.String("peer-id", id))
-	conf := &scuttlebutt.Config{
-		ID: id,
-		// Use a port of 0 to let the system assigned a free port.
-		BindAddr: "127.0.0.1:0",
-		SeedCB: func() []string {
+
+	gossiper, err := scuttlebutt.Create(
+		id,
+		"127.0.0.1:0",
+		scuttlebutt.WithSeedCB(func() []string {
 			return c.seeds(3)
-		},
-		GossipInterval: time.Millisecond * 100,
-		Logger:         logger,
-	}
-	gossiper, err := scuttlebutt.Create(conf)
+		}),
+		scuttlebutt.WithInterval(time.Millisecond*100),
+		scuttlebutt.WithLogger(logger),
+	)
 	if err != nil {
 		return nil, err
 	}
