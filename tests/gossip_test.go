@@ -18,9 +18,6 @@ func TestGossip_PropagateUpdate(t *testing.T) {
 	node2, err := cluster.AddNode("node-2", nil)
 	assert.Nil(t, err)
 
-	err = node1.Seed(cluster.Seeds())
-	assert.Nil(t, err)
-
 	node2.UpdateLocal("foo", "bar")
 
 	update, ok := sub.WaitPeerUpdatedWithTimeout(3 * time.Second)
@@ -40,14 +37,11 @@ func TestGossip_PeerDiscovery(t *testing.T) {
 
 	sub := NewNodeSubscriber()
 
-	node1, err := cluster.AddNode("node-1", sub)
+	_, err := cluster.AddNode("node-1", sub)
 	assert.Nil(t, err)
 	_, err = cluster.AddNode("node-2", nil)
 	assert.Nil(t, err)
 	_, err = cluster.AddNode("node-3", nil)
-	assert.Nil(t, err)
-
-	err = node1.Seed(cluster.Seeds())
 	assert.Nil(t, err)
 
 	// Wait to discovery the other nodes.

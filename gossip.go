@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	multierror "github.com/hashicorp/go-multierror"
 	"go.uber.org/zap"
 )
 
@@ -15,7 +14,7 @@ import (
 type Gossip struct {
 	peerMap        *peerMap
 	protocol       *protocol
-	seeds          []string
+	seedCB         func() []string
 	gossipInterval time.Duration
 	transport      Transport
 	done           chan struct{}
@@ -35,33 +34,6 @@ func Create(conf *Config) (*Gossip, error) {
 	}
 	g.schedule()
 	return g, nil
-}
-
-// Seed attempts to join the cluster by syncing with the given seed node
-// addresses.
-//
-// Note this does not wait for the sync to complete.
-//
-// This may be called multiple times, such as if all known nodes leave and so
-// the node needs to bootstrap again.
-func (g *Gossip) Seed(seeds []string) error {
-	g.logger.Debug("seeding gossiper", zap.Strings("seeds", seeds))
-
-	g.seeds = seeds
-
-	var errs error
-	// Immediately try all seeds.
-	for _, addr := range seeds {
-		// Ignore ourselves.
-		if addr == g.BindAddr() {
-			continue
-		}
-
-		if err := g.sync(addr); err != nil {
-			errs = multierror.Append(errs, err)
-		}
-	}
-	return errs
 }
 
 // Peers returns the peer IDs of the peers known by this node (excluding
@@ -155,7 +127,7 @@ func newGossip(conf *Config) (*Gossip, error) {
 	return &Gossip{
 		peerMap:        peerMap,
 		protocol:       newProtocol(peerMap, logger),
-		seeds:          []string{},
+		seedCB:         conf.SeedCB,
 		gossipInterval: gossipInterval,
 		transport:      transport,
 		done:           make(chan struct{}),
@@ -180,30 +152,47 @@ func (g *Gossip) gossipLoop() {
 		case packet := <-g.transport.PacketCh():
 			g.onPacket(packet)
 		case <-ticker.C:
-			g.gossip()
+			g.round()
 		case <-g.done:
 			return
 		}
 	}
 }
 
-func (g *Gossip) gossip() {
+func (g *Gossip) round() {
 	if len(g.peerMap.Peers()) == 0 {
-		// If we have seeds but no peers try and seed again.
-		if len(g.seeds) != 0 {
-			g.Seed(g.seeds)
-		}
+		// If we don't know about any other peers in the cluster re-seed.
+		g.seed()
 		return
 	}
 
+	// Gossip with a random peer.
 	peers := g.peerMap.Peers()
 	peer := peers[rand.Intn(len(peers))]
-	g.logger.Debug("gossip with peer", zap.String("id", peer))
 	addr, ok := g.peerMap.Addr(peer)
 	if !ok {
 		return
 	}
-	g.sync(addr)
+	g.gossip(peer, addr)
+}
+
+func (g *Gossip) seed() {
+	if g.seedCB == nil {
+		g.logger.Debug("no seed cb; skipping")
+		return
+	}
+
+	seeds := g.seedCB()
+
+	g.logger.Debug("seeding gossiper", zap.Strings("seeds", seeds))
+
+	for _, addr := range seeds {
+		// Ignore ourselves.
+		if addr == g.BindAddr() {
+			continue
+		}
+		g.gossip("seed", addr)
+	}
 }
 
 func (g *Gossip) onPacket(p *Packet) {
@@ -220,8 +209,12 @@ func (g *Gossip) onPacket(p *Packet) {
 	}
 }
 
-func (g *Gossip) sync(addr string) error {
-	g.logger.Debug("sync with peer", zap.String("addr", addr))
+func (g *Gossip) gossip(id string, addr string) error {
+	g.logger.Debug(
+		"gossip with peer",
+		zap.String("id", id),
+		zap.String("addr", addr),
+	)
 
 	b, err := g.protocol.DigestRequest()
 	if err != nil {
