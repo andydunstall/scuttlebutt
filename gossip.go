@@ -162,7 +162,7 @@ func (g *Gossip) gossipLoop() {
 func (g *Gossip) round() {
 	if len(g.peerMap.Peers()) == 0 {
 		// If we don't know about any other peers in the cluster re-seed.
-		g.seed()
+		g.foo.Seed()
 		return
 	}
 
@@ -173,60 +173,62 @@ func (g *Gossip) round() {
 	if !ok {
 		return
 	}
-	g.gossip(peer, addr)
+	g.foo.Gossip(peer, addr)
 }
 
-func (g *Gossip) seed() {
-	if g.seedCB == nil {
-		g.logger.Debug("no seed cb; skipping")
-		return
-	}
-
-	seeds := g.seedCB()
-
-	g.logger.Debug("seeding gossiper", zap.Strings("seeds", seeds))
-
-	for _, addr := range seeds {
-		// Ignore ourselves.
-		if addr == g.BindAddr() {
-			continue
-		}
-		g.gossip("seed", addr)
-	}
-}
+// func (g *Gossip) seed() {
+// 	if g.seedCB == nil {
+// 		g.logger.Debug("no seed cb; skipping")
+// 		return
+// 	}
+// 
+// 	seeds := g.seedCB()
+// 
+// 	g.logger.Debug("seeding gossiper", zap.Strings("seeds", seeds))
+// 
+// 	for _, addr := range seeds {
+// 		// Ignore ourselves.
+// 		if addr == g.BindAddr() {
+// 			continue
+// 		}
+// 		g.gossip("seed", addr)
+// 	}
+// }
 
 func (g *Gossip) onPacket(p *Packet) {
-	responses, err := g.protocol.OnMessage(p.Buf)
-	if err != nil {
-		return
-	}
-	for _, b := range responses {
-		_, err := g.transport.WriteTo(b, p.From.String())
-		if err != nil {
-			g.logger.Error("failed to write to transport", zap.Error(err))
-			return
-		}
-	}
+	f.foo.OnMessage(p.Buf)
+
+	// responses, err := g.protocol.OnMessage(p.Buf)
+	// if err != nil {
+	// 	return
+	// }
+	// for _, b := range responses {
+	// 	_, err := g.transport.WriteTo(b, p.From.String())
+	// 	if err != nil {
+	// 		g.logger.Error("failed to write to transport", zap.Error(err))
+	// 		return
+	// 	}
+	// }
 }
 
-func (g *Gossip) gossip(id string, addr string) error {
-	g.logger.Debug(
-		"gossip with peer",
-		zap.String("id", id),
-		zap.String("addr", addr),
-	)
-
-	b, err := g.protocol.DigestRequest()
-	if err != nil {
-		g.logger.Error("failed to get digest reqeust", zap.Error(err))
-		return err
-	}
-
-	_, err = g.transport.WriteTo(b, addr)
-	if err != nil {
-		g.logger.Error("failed to write to transport", zap.Error(err))
-		return fmt.Errorf("failed to write to transport %s: %v", addr, err)
-	}
-
-	return nil
-}
+// func (g *Gossip) gossip(id string, addr string) error {
+// 	g.logger.Debug(
+// 		"gossip with peer",
+// 		zap.String("id", id),
+// 		zap.String("addr", addr),
+// 	)
+// 
+// 	b, err := g.protocol.DigestRequest()
+// 	if err != nil {
+// 		g.logger.Error("failed to get digest reqeust", zap.Error(err))
+// 		return err
+// 	}
+// 
+// 	_, err = g.transport.WriteTo(b, addr)
+// 	if err != nil {
+// 		g.logger.Error("failed to write to transport", zap.Error(err))
+// 		return fmt.Errorf("failed to write to transport %s: %v", addr, err)
+// 	}
+// 
+// 	return nil
+// }
