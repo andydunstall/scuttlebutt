@@ -1,4 +1,4 @@
-package scuttlebutt
+package internal
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ const (
 	typeDigestResponse messageType = 1
 	typeDelta          messageType = 2
 
-	maxNodeIDSize = 0xff
+	MaxNodeIDSize = 0xff
 )
 
 type codec struct{}
@@ -24,19 +24,19 @@ func newCodec() *codec {
 func (c *codec) Encode(mType messageType, v interface{}) ([]byte, error) {
 	switch mType {
 	case typeDigestRequest:
-		d, ok := v.(*digest)
+		d, ok := v.(*Digest)
 		if !ok {
 			return nil, fmt.Errorf("digest expected")
 		}
 		return c.encodeDigest("digest-request", d)
 	case typeDigestResponse:
-		d, ok := v.(*digest)
+		d, ok := v.(*Digest)
 		if !ok {
 			return nil, fmt.Errorf("digest expected")
 		}
 		return c.encodeDigest("digest-response", d)
 	case typeDelta:
-		d, ok := v.(*delta)
+		d, ok := v.(*Delta)
 		if !ok {
 			return nil, fmt.Errorf("delta expected")
 		}
@@ -77,21 +77,21 @@ func (c *codec) Decode(b []byte, v interface{}) error {
 
 	switch t {
 	case typeDigestRequest:
-		d, ok := v.(*digest)
+		d, ok := v.(*Digest)
 		if !ok {
 			return fmt.Errorf("failed to decode message: digest expected")
 		}
 		*d = *m.Digest
 		return nil
 	case typeDigestResponse:
-		d, ok := v.(*digest)
+		d, ok := v.(*Digest)
 		if !ok {
 			return fmt.Errorf("failed to decode message: digest expected")
 		}
 		*d = *m.Digest
 		return nil
 	case typeDelta:
-		d, ok := v.(*delta)
+		d, ok := v.(*Delta)
 		if !ok {
 			return fmt.Errorf("failed to decode message: delta expected")
 		}
@@ -102,7 +102,7 @@ func (c *codec) Decode(b []byte, v interface{}) error {
 	}
 }
 
-func (c *codec) encodeDigest(mType string, d *digest) ([]byte, error) {
+func (c *codec) encodeDigest(mType string, d *Digest) ([]byte, error) {
 	m := message{
 		Type:   mType,
 		Digest: d,
@@ -114,7 +114,7 @@ func (c *codec) encodeDigest(mType string, d *digest) ([]byte, error) {
 	return b, nil
 }
 
-func (c *codec) encodeDelta(d *delta) ([]byte, error) {
+func (c *codec) encodeDelta(d *Delta) ([]byte, error) {
 	m := message{
 		Type:  "delta",
 		Delta: d,

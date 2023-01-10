@@ -1,4 +1,4 @@
-package scuttlebutt
+package internal
 
 import (
 	"testing"
@@ -9,16 +9,16 @@ import (
 func TestCodec_EncodeAndDecodeDigestRequest(t *testing.T) {
 	c := newCodec()
 
-	orig := &digest{
-		"peer-1": peerDigest{
+	orig := &Digest{
+		"peer-1": PeerDigest{
 			Addr:    "10.26.104.52:1001",
 			Version: 14,
 		},
-		"peer-2": peerDigest{
+		"peer-2": PeerDigest{
 			Addr:    "10.26.104.52:1003",
 			Version: 15,
 		},
-		"peer-3": peerDigest{
+		"peer-3": PeerDigest{
 			Addr:    "10.26.104.52:1004",
 			Version: 2,
 		},
@@ -30,7 +30,7 @@ func TestCodec_EncodeAndDecodeDigestRequest(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, typeDigestRequest, mType)
 
-	var decoded digest
+	var decoded Digest
 	assert.Nil(t, c.Decode(b, &decoded))
 
 	assert.Equal(t, orig, &decoded)
@@ -39,16 +39,16 @@ func TestCodec_EncodeAndDecodeDigestRequest(t *testing.T) {
 func TestCodec_EncodeAndDecodeDigestResponse(t *testing.T) {
 	c := newCodec()
 
-	orig := &digest{
-		"peer-1": peerDigest{
+	orig := &Digest{
+		"peer-1": PeerDigest{
 			Addr:    "10.26.104.52:1001",
 			Version: 14,
 		},
-		"peer-2": peerDigest{
+		"peer-2": PeerDigest{
 			Addr:    "10.26.104.52:1003",
 			Version: 15,
 		},
-		"peer-3": peerDigest{
+		"peer-3": PeerDigest{
 			Addr:    "10.26.104.52:1004",
 			Version: 2,
 		},
@@ -60,7 +60,7 @@ func TestCodec_EncodeAndDecodeDigestResponse(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, typeDigestResponse, mType)
 
-	var decoded digest
+	var decoded Digest
 	assert.Nil(t, c.Decode(b, &decoded))
 
 	assert.Equal(t, orig, &decoded)
@@ -69,17 +69,17 @@ func TestCodec_EncodeAndDecodeDigestResponse(t *testing.T) {
 func TestCodec_EncodeAndDecodeDelta(t *testing.T) {
 	c := newCodec()
 
-	orig := &delta{
-		"peer-1": peerDelta{
+	orig := &Delta{
+		"peer-1": PeerDelta{
 			Addr: "10.26.104.52:1001",
-			Deltas: []deltaEntry{
+			Deltas: []DeltaEntry{
 				{Key: "a", Value: "1", Version: 12},
 				{Key: "b", Value: "2", Version: 14},
 			},
 		},
-		"peer-2": peerDelta{
+		"peer-2": PeerDelta{
 			Addr: "10.26.104.52:1003",
-			Deltas: []deltaEntry{
+			Deltas: []DeltaEntry{
 				{Key: "c", Value: "3", Version: 15},
 			},
 		},
@@ -91,7 +91,7 @@ func TestCodec_EncodeAndDecodeDelta(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, typeDelta, mType)
 
-	var decoded delta
+	var decoded Delta
 	assert.Nil(t, c.Decode(b, &decoded))
 
 	assert.Equal(t, orig, &decoded)

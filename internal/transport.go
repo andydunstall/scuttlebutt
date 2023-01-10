@@ -1,4 +1,4 @@
-package scuttlebutt
+package internal
 
 import (
 	"net"
