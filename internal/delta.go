@@ -1,45 +1,45 @@
-package scuttlebutt
+package internal
 
 import (
 	"go.uber.org/zap/zapcore"
 )
 
-type deltaEntry struct {
+type DeltaEntry struct {
 	Key     string `json:"key,omitempty"`
 	Value   string `json:"value,omitempty"`
 	Version uint64 `json:"version,omitempty"`
 }
 
-func (e deltaEntry) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+func (e DeltaEntry) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("key", e.Key)
 	enc.AddString("value", e.Value)
 	enc.AddUint64("version", e.Version)
 	return nil
 }
 
-type deltaEntries []deltaEntry
+type DeltaEntries []DeltaEntry
 
-func (d deltaEntries) MarshalLogArray(enc zapcore.ArrayEncoder) error {
+func (d DeltaEntries) MarshalLogArray(enc zapcore.ArrayEncoder) error {
 	for _, e := range d {
 		enc.AppendObject(e)
 	}
 	return nil
 }
 
-type peerDelta struct {
+type PeerDelta struct {
 	Addr   string       `json:"addr,omitempty"`
-	Deltas deltaEntries `json:"deltas,omitempty"`
+	Deltas DeltaEntries `json:"deltas,omitempty"`
 }
 
-func (p peerDelta) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+func (p PeerDelta) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("addr", p.Addr)
 	enc.AddArray("deltas", p.Deltas)
 	return nil
 }
 
-type delta map[string]peerDelta
+type Delta map[string]PeerDelta
 
-func (d delta) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+func (d Delta) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	for peerID, peerDelta := range d {
 		enc.AddObject(peerID, peerDelta)
 	}

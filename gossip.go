@@ -6,17 +6,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/andydunstall/scuttlebutt/internal"
 	"go.uber.org/zap"
 )
 
 // Gossip handles cluster membership using the scuttlebutt protocol.
 // This is thread safe.
 type Gossip struct {
-	peerMap        *peerMap
-	protocol       *protocol
+	peerMap        *internal.PeerMap
+	protocol       *internal.Protocol
 	seedCB         func() []string
 	gossipInterval time.Duration
-	transport      Transport
+	transport      internal.Transport
 	done           chan struct{}
 	wg             sync.WaitGroup
 	logger         *zap.Logger
@@ -87,11 +88,11 @@ func (g *Gossip) Shutdown() error {
 func newGossip(id string, addr string, opts *Options) (*Gossip, error) {
 	// Limit the size of the node ID size this is encoded with a 1 byte size
 	// prefix.
-	if len(id) > maxNodeIDSize {
+	if len(id) > internal.MaxNodeIDSize {
 		return nil, fmt.Errorf("node id too large (cannot exceed 256 bytes)")
 	}
 
-	transport, err := NewUDPTransport(addr, opts.Logger)
+	transport, err := internal.NewUDPTransport(addr, opts.Logger)
 	if err != nil {
 		opts.Logger.Error("failed to start transport", zap.Error(err))
 		return nil, err
@@ -99,7 +100,7 @@ func newGossip(id string, addr string, opts *Options) (*Gossip, error) {
 
 	opts.Logger.Debug("transport started", zap.String("addr", transport.BindAddr()))
 
-	peerMap := newPeerMap(
+	peerMap := internal.NewPeerMap(
 		id,
 		// Note use transport bind addr not configured bind addr as these
 		// may be different if the system assigns the port.
@@ -112,7 +113,7 @@ func newGossip(id string, addr string, opts *Options) (*Gossip, error) {
 
 	return &Gossip{
 		peerMap:        peerMap,
-		protocol:       newProtocol(peerMap, opts.Logger),
+		protocol:       internal.NewProtocol(peerMap, opts.Logger),
 		seedCB:         opts.SeedCB,
 		gossipInterval: opts.Interval,
 		transport:      transport,
@@ -181,7 +182,7 @@ func (g *Gossip) seed() {
 	}
 }
 
-func (g *Gossip) onPacket(p *Packet) {
+func (g *Gossip) onPacket(p *internal.Packet) {
 	responses, err := g.protocol.OnMessage(p.Buf)
 	if err != nil {
 		return

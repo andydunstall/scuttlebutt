@@ -1,56 +1,56 @@
-package scuttlebutt
+package internal
 
 import (
 	"sort"
 )
 
-type peerEntry struct {
+type PeerEntry struct {
 	Version uint64
 	Value   string
 }
 
-// peer represents the state of a peer.
-type peer struct {
+// Peer represents the state of a peer.
+type Peer struct {
 	peerID string
 	addr   string
 	// version is the highest version of all the peers entries. This is used to
 	// compare versions between nodes to check for missing updates.
 	version uint64
 	// entries contains the peer state to be propagated around the cluster.
-	entries map[string]peerEntry
+	entries map[string]PeerEntry
 }
 
-// newPeer returns a new peer with the given ID, with a version of 0 to indicate
+// NewPeer returns a new peer with the given ID, with a version of 0 to indicate
 // this hasn't had any updates.
-func newPeer(peerID string, addr string) *peer {
-	return &peer{
+func NewPeer(peerID string, addr string) *Peer {
+	return &Peer{
 		peerID:  peerID,
 		addr:    addr,
 		version: 0,
-		entries: make(map[string]peerEntry),
+		entries: make(map[string]PeerEntry),
 	}
 }
 
-func (p *peer) ID() string {
+func (p *Peer) ID() string {
 	return p.peerID
 }
 
-func (p *peer) Addr() string {
+func (p *Peer) Addr() string {
 	return p.addr
 }
 
-func (p *peer) Version() uint64 {
+func (p *Peer) Version() uint64 {
 	return p.version
 }
 
-func (p *peer) Lookup(key string) (peerEntry, bool) {
+func (p *Peer) Lookup(key string) (PeerEntry, bool) {
 	if entry, ok := p.entries[key]; ok {
 		return entry, true
 	}
-	return peerEntry{}, false
+	return PeerEntry{}, false
 }
 
-func (p *peer) Equal(o *peer) bool {
+func (p *Peer) Equal(o *Peer) bool {
 	if p.peerID != o.peerID {
 		return false
 	}
@@ -84,7 +84,7 @@ func (p *peer) Equal(o *peer) bool {
 // increments the peers version so it is propagated around the cluster.
 // If the value is unchanged, the version isn't updated (to avoid propagating
 // redundant data).
-func (p *peer) UpdateLocal(key string, value string) {
+func (p *Peer) UpdateLocal(key string, value string) {
 	if entry, ok := p.entries[key]; ok {
 		if entry.Value == value {
 			return
@@ -92,7 +92,7 @@ func (p *peer) UpdateLocal(key string, value string) {
 	}
 
 	p.version++
-	p.entries[key] = peerEntry{
+	p.entries[key] = PeerEntry{
 		Version: p.version,
 		Value:   value,
 	}
@@ -101,7 +101,7 @@ func (p *peer) UpdateLocal(key string, value string) {
 // UpdateRemote updates the peer from an update from a remote node. If the
 // local version of that entry is greater than the new version, the update is
 // discarded.
-func (p *peer) UpdateRemote(key string, value string, version uint64) {
+func (p *Peer) UpdateRemote(key string, value string, version uint64) {
 	// Ignore updates with a smaller version than the current entry.
 	if entry, ok := p.entries[key]; ok {
 		if version <= entry.Version {
@@ -109,7 +109,7 @@ func (p *peer) UpdateRemote(key string, value string, version uint64) {
 		}
 	}
 
-	p.entries[key] = peerEntry{
+	p.entries[key] = PeerEntry{
 		Version: version,
 		Value:   value,
 	}
@@ -118,8 +118,8 @@ func (p *peer) UpdateRemote(key string, value string, version uint64) {
 	}
 }
 
-func (p *peer) Digest() peerDigest {
-	return peerDigest{
+func (p *Peer) Digest() PeerDigest {
+	return PeerDigest{
 		Addr:    p.addr,
 		Version: p.version,
 	}
@@ -130,14 +130,14 @@ func (p *peer) Digest() peerDigest {
 //
 // Note ordering deltas by version (per peer) is important since the full
 // delta may not be sent - and we can't have gaps in versions.
-func (p *peer) Deltas(version uint64) peerDelta {
-	deltas := []deltaEntry{}
+func (p *Peer) Deltas(version uint64) PeerDelta {
+	deltas := []DeltaEntry{}
 	for key, entry := range p.entries {
 		if entry.Version <= version {
 			continue
 		}
 
-		deltas = append(deltas, deltaEntry{
+		deltas = append(deltas, DeltaEntry{
 			Key:     key,
 			Value:   entry.Value,
 			Version: entry.Version,
@@ -150,7 +150,7 @@ func (p *peer) Deltas(version uint64) peerDelta {
 		return deltas[i].Version < deltas[j].Version
 	})
 
-	return peerDelta{
+	return PeerDelta{
 		Addr:   p.addr,
 		Deltas: deltas,
 	}

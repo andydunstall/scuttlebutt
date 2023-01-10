@@ -1,4 +1,4 @@
-package scuttlebutt
+package internal
 
 import (
 	"fmt"
@@ -6,26 +6,26 @@ import (
 	"go.uber.org/zap"
 )
 
-type protocol struct {
-	peerMap *peerMap
+type Protocol struct {
+	peerMap *PeerMap
 	codec   *codec
 	logger  *zap.Logger
 }
 
-func newProtocol(peerMap *peerMap, logger *zap.Logger) *protocol {
-	return &protocol{
+func NewProtocol(peerMap *PeerMap, logger *zap.Logger) *Protocol {
+	return &Protocol{
 		peerMap: peerMap,
 		codec:   newCodec(),
 		logger:  logger,
 	}
 }
 
-func (p *protocol) DigestRequest() ([]byte, error) {
+func (p *Protocol) DigestRequest() ([]byte, error) {
 	digest := p.peerMap.Digest()
 	return p.codec.Encode(typeDigestRequest, &digest)
 }
 
-func (p *protocol) OnMessage(b []byte) ([][]byte, error) {
+func (p *Protocol) OnMessage(b []byte) ([][]byte, error) {
 	mType, err := p.codec.DecodeType(b)
 	if err != nil {
 		return nil, err
@@ -33,21 +33,21 @@ func (p *protocol) OnMessage(b []byte) ([][]byte, error) {
 
 	switch mType {
 	case typeDigestRequest:
-		var d digest
+		var d Digest
 		if err = p.codec.Decode(b, &d); err != nil {
 			p.logger.Error("invalid digest request", zap.Error(err))
 			return nil, err
 		}
 		return p.handleDigest(&d, true)
 	case typeDigestResponse:
-		var d digest
+		var d Digest
 		if err = p.codec.Decode(b, &d); err != nil {
 			p.logger.Error("invalid digest response", zap.Error(err))
 			return nil, err
 		}
 		return p.handleDigest(&d, false)
 	case typeDelta:
-		var d delta
+		var d Delta
 		if err = p.codec.Decode(b, &d); err != nil {
 			p.logger.Error("invalid delta response", zap.Error(err))
 			return nil, err
@@ -59,7 +59,7 @@ func (p *protocol) OnMessage(b []byte) ([][]byte, error) {
 	}
 }
 
-func (p *protocol) handleDigest(digest *digest, request bool) ([][]byte, error) {
+func (p *Protocol) handleDigest(digest *Digest, request bool) ([][]byte, error) {
 	responses := [][]byte{}
 
 	// Add any peers we didn't know existed to the peer map.
@@ -96,16 +96,16 @@ func (p *protocol) handleDigest(digest *digest, request bool) ([][]byte, error) 
 	return responses, nil
 }
 
-func (p *protocol) handleDelta(delta *delta) ([][]byte, error) {
+func (p *Protocol) handleDelta(delta *Delta) ([][]byte, error) {
 	p.peerMap.ApplyDeltas(*delta)
 	return [][]byte{}, nil
 }
 
-func (p *protocol) deltaResponse(delta *delta) ([]byte, error) {
+func (p *Protocol) deltaResponse(delta *Delta) ([]byte, error) {
 	return p.codec.Encode(typeDelta, delta)
 }
 
-func (p *protocol) digestResponse() ([]byte, error) {
+func (p *Protocol) digestResponse() ([]byte, error) {
 	digest := p.peerMap.Digest()
 	return p.codec.Encode(typeDigestResponse, &digest)
 }

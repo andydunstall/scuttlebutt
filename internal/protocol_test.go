@@ -1,4 +1,4 @@
-package scuttlebutt
+package internal
 
 import (
 	"testing"
@@ -10,17 +10,17 @@ import (
 type fakePeer struct {
 	ID       string
 	Addr     string
-	PeerMap  *peerMap
-	Protocol *protocol
+	PeerMap  *PeerMap
+	Protocol *Protocol
 }
 
 func newFakePeer(id string, addr string) *fakePeer {
-	peerMap := newPeerMap(id, addr, nil, nil, nil, zap.NewNop())
+	peerMap := NewPeerMap(id, addr, nil, nil, nil, zap.NewNop())
 	return &fakePeer{
 		ID:       id,
 		Addr:     addr,
 		PeerMap:  peerMap,
-		Protocol: newProtocol(peerMap, zap.NewNop()),
+		Protocol: NewProtocol(peerMap, zap.NewNop()),
 	}
 }
 

@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/andydunstall/scuttlebutt/cluster"
+	"github.com/andydunstall/scuttlebutt/eval/pkg/cluster"
 	"github.com/spf13/cobra"
 )
 

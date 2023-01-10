@@ -1,23 +1,23 @@
-package scuttlebutt
+package internal
 
 import (
 	"go.uber.org/zap/zapcore"
 )
 
-type peerDigest struct {
+type PeerDigest struct {
 	Addr    string `json:"addr,omitempty"`
 	Version uint64 `json:"version,omitempty"`
 }
 
-func (p peerDigest) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+func (p PeerDigest) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("addr", p.Addr)
 	enc.AddUint64("version", p.Version)
 	return nil
 }
 
-type digest map[string]peerDigest
+type Digest map[string]PeerDigest
 
-func (d digest) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+func (d Digest) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	for peerID, peerDigest := range d {
 		enc.AddObject(peerID, peerDigest)
 	}
