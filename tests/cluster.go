@@ -70,22 +70,19 @@ func NewCluster() *Cluster {
 }
 
 func (c *Cluster) AddNode(peerID string, nodeSub *NodeSubscriber) (*scuttlebutt.Gossip, error) {
-	conf := &scuttlebutt.Config{
-		ID: peerID,
-		// Use a port of 0 to let the system assigned a free port.
-		BindAddr: "127.0.0.1:0",
-		SeedCB: func() []string {
+	opts := []scuttlebutt.Option{
+		scuttlebutt.WithSeedCB(func() []string {
 			return c.Seeds()
-		},
-		GossipInterval: time.Millisecond * 100,
+		}),
+		scuttlebutt.WithInterval(time.Millisecond * 100),
 	}
 	if nodeSub != nil {
-		conf.OnJoin = nodeSub.OnJoin
-		conf.OnLeave = nodeSub.OnLeave
-		conf.OnUpdate = nodeSub.OnUpdate
+		opts = append(opts, scuttlebutt.WithOnJoin(nodeSub.OnJoin))
+		opts = append(opts, scuttlebutt.WithOnLeave(nodeSub.OnLeave))
+		opts = append(opts, scuttlebutt.WithOnUpdate(nodeSub.OnUpdate))
 	}
 
-	node, err := scuttlebutt.Create(conf)
+	node, err := scuttlebutt.Create(peerID, "127.0.0.1:0", opts...)
 	if err != nil {
 		return nil, err
 	}

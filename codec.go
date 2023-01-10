@@ -11,6 +11,8 @@ const (
 	typeDigestRequest  messageType = 0
 	typeDigestResponse messageType = 1
 	typeDelta          messageType = 2
+
+	maxNodeIDSize = 0xff
 )
 
 type codec struct{}

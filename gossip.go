@@ -27,8 +27,13 @@ type Gossip struct {
 // will not attempt to join the cluster itself unless contacted by another
 // node.
 // After this the given configuration should not be modified again.
-func Create(conf *Config) (*Gossip, error) {
-	g, err := newGossip(conf)
+func Create(id string, addr string, options ...Option) (*Gossip, error) {
+	opts := defaultOptions()
+	for _, opt := range options {
+		opt(opts)
+	}
+
+	g, err := newGossip(id, addr, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -79,60 +84,41 @@ func (g *Gossip) Shutdown() error {
 	return err
 }
 
-func newGossip(conf *Config) (*Gossip, error) {
-	logger := conf.Logger
-	if logger == nil {
-		logger = zap.NewNop()
+func newGossip(id string, addr string, opts *Options) (*Gossip, error) {
+	// Limit the size of the node ID size this is encoded with a 1 byte size
+	// prefix.
+	if len(id) > maxNodeIDSize {
+		return nil, fmt.Errorf("node id too large (cannot exceed 256 bytes)")
 	}
 
-	if conf.ID == "" {
-		logger.Error("config missing a node ID")
-		return nil, fmt.Errorf("config missing a node ID")
+	transport, err := NewUDPTransport(addr, opts.Logger)
+	if err != nil {
+		opts.Logger.Error("failed to start transport", zap.Error(err))
+		return nil, err
 	}
 
-	if conf.BindAddr == "" {
-		logger.Error("config missing a bind addr")
-		return nil, fmt.Errorf("config missing a bind addr")
-	}
-
-	// By default gossip every 500ms.
-	gossipInterval := conf.GossipInterval
-	if gossipInterval == 0 {
-		gossipInterval = time.Millisecond * 500
-	}
-
-	transport := conf.Transport
-	if transport == nil {
-		var err error
-		transport, err = NewUDPTransport(conf.BindAddr, logger)
-		if err != nil {
-			logger.Error("failed to start transport", zap.Error(err))
-			return nil, err
-		}
-	}
-
-	logger.Debug("transport started", zap.String("addr", transport.BindAddr()))
+	opts.Logger.Debug("transport started", zap.String("addr", transport.BindAddr()))
 
 	peerMap := newPeerMap(
-		conf.ID,
+		id,
 		// Note use transport bind addr not configured bind addr as these
 		// may be different if the system assigns the port.
 		transport.BindAddr(),
-		conf.OnJoin,
-		conf.OnLeave,
-		conf.OnUpdate,
-		logger,
+		opts.OnJoin,
+		opts.OnLeave,
+		opts.OnUpdate,
+		opts.Logger,
 	)
 
 	return &Gossip{
 		peerMap:        peerMap,
-		protocol:       newProtocol(peerMap, logger),
-		seedCB:         conf.SeedCB,
-		gossipInterval: gossipInterval,
+		protocol:       newProtocol(peerMap, opts.Logger),
+		seedCB:         opts.SeedCB,
+		gossipInterval: opts.Interval,
 		transport:      transport,
 		done:           make(chan struct{}),
 		wg:             sync.WaitGroup{},
-		logger:         logger,
+		logger:         opts.Logger,
 	}, nil
 }
 

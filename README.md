@@ -33,6 +33,8 @@ cluster. If `SeedCB` is given it will attempt to join the cluster by gossiping
 with these nodes. Note whenever the node doesn't know about any other peers it
 will re-seed by calling `SeedCB` to get a new list of seeds.
 
+The size of the node ID must not exceed 256 bytes.
+
 ```go
 node := scuttlebutt.Create(&scuttlebutt.Config{
 	ID: "773dc6df",
