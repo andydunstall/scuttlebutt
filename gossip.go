@@ -85,6 +85,12 @@ func (g *Gossip) Shutdown() error {
 }
 
 func newGossip(id string, addr string, opts *Options) (*Gossip, error) {
+	// Limit the size of the node ID size this is encoded with a 1 byte size
+	// prefix.
+	if len(id) > maxNodeIDSize {
+		return nil, fmt.Errorf("node id too large (cannot exceed 256 bytes)")
+	}
+
 	transport, err := NewUDPTransport(addr, opts.Logger)
 	if err != nil {
 		opts.Logger.Error("failed to start transport", zap.Error(err))
