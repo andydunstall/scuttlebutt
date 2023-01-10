@@ -85,14 +85,10 @@ func (g *Gossip) Shutdown() error {
 }
 
 func newGossip(id string, addr string, opts *Options) (*Gossip, error) {
-	transport := opts.Transport
-	if transport == nil {
-		var err error
-		transport, err = NewUDPTransport(addr, opts.Logger)
-		if err != nil {
-			opts.Logger.Error("failed to start transport", zap.Error(err))
-			return nil, err
-		}
+	transport, err := NewUDPTransport(addr, opts.Logger)
+	if err != nil {
+		opts.Logger.Error("failed to start transport", zap.Error(err))
+		return nil, err
 	}
 
 	opts.Logger.Debug("transport started", zap.String("addr", transport.BindAddr()))

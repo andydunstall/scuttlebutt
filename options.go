@@ -26,10 +26,6 @@ type Options struct {
 	// OnUpdate is invoked when a peers state is updated.
 	OnUpdate func(peerID string, key string, value string)
 
-	// Transport used to communicate with other nodes. If unset gossip
-	// uses UDPTransport listening on BindAddr.
-	Transport Transport
-
 	// Interval is the time between gossip rounds, when the node selects
 	// a random peer to sync with.
 	// If not set defaults to 500ms.
@@ -64,12 +60,6 @@ func WithOnUpdate(cb func(peerID string, key string, value string)) Option {
 	}
 }
 
-func WithTransport(transport Transport) Option {
-	return func(opts *Options) {
-		opts.Transport = transport
-	}
-}
-
 func WithInterval(interval time.Duration) Option {
 	return func(opts *Options) {
 		opts.Interval = interval
@@ -84,12 +74,11 @@ func WithLogger(logger *zap.Logger) Option {
 
 func defaultOptions() *Options {
 	return &Options{
-		SeedCB:    nil,
-		OnJoin:    nil,
-		OnLeave:   nil,
-		OnUpdate:  nil,
-		Transport: nil,
-		Interval:  DefaultInterval,
-		Logger:    zap.NewNop(),
+		SeedCB:   nil,
+		OnJoin:   nil,
+		OnLeave:  nil,
+		OnUpdate: nil,
+		Interval: DefaultInterval,
+		Logger:   zap.NewNop(),
 	}
 }
