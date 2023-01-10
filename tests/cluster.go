@@ -73,7 +73,10 @@ func (c *Cluster) AddNode(peerID string, nodeSub *NodeSubscriber) (*scuttlebutt.
 	conf := &scuttlebutt.Config{
 		ID: peerID,
 		// Use a port of 0 to let the system assigned a free port.
-		BindAddr:       "127.0.0.1:0",
+		BindAddr: "127.0.0.1:0",
+		SeedCB: func() []string {
+			return c.Seeds()
+		},
 		GossipInterval: time.Millisecond * 100,
 	}
 	if nodeSub != nil {

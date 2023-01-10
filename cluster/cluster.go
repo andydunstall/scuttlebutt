@@ -60,7 +60,10 @@ func (c *Cluster) AddNode() (*Node, error) {
 	conf := &scuttlebutt.Config{
 		ID: id,
 		// Use a port of 0 to let the system assigned a free port.
-		BindAddr:       "127.0.0.1:0",
+		BindAddr: "127.0.0.1:0",
+		SeedCB: func() []string {
+			return c.seeds(3)
+		},
 		GossipInterval: time.Millisecond * 100,
 		Logger:         logger,
 	}
@@ -73,9 +76,6 @@ func (c *Cluster) AddNode() (*Node, error) {
 		Gossiper: gossiper,
 	}
 	c.nodes[node.ID] = node
-	if err = node.Gossiper.Seed(c.seeds(3)); err != nil {
-		return nil, err
-	}
 	return node, nil
 }
 

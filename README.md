@@ -29,13 +29,17 @@ The full API docs can be viewed with `go doc --all`.
 
 ### Create a gossip node
 Creates a new node, which will start listening for updates from nodes in the
-cluster. Since it does not yet know about any other nodes, it will not join
-the cluster unless contacted by another node.
+cluster. If `SeedCB` is given it will attempt to join the cluster by gossiping
+with these nodes. Note whenever the node doesn't know about any other peers it
+will re-seed by calling `SeedCB` to get a new list of seeds.
 
 ```go
 node := scuttlebutt.Create(&scuttlebutt.Config{
 	ID: "773dc6df",
 	BindAddr: "0.0.0.0:8229",
+	SeedCB: func() []string {
+		return myconfig.Seeds
+	},
 	// Receive events about nodes joining, leaving and updating.
 	OnJoin: func(peerID string) {
 		fmt.Println("Node joined", peerID)
@@ -47,17 +51,6 @@ node := scuttlebutt.Create(&scuttlebutt.Config{
 		fmt.Println("Node updated", peerID, key, value)
 	}
 })
-```
-
-### Seed the node
-To join the cluster we must tell the node the address of at least one other
-node in the cluster. Once it syncs with these nodes it will learn about other
-nodes in the cluster and contact them directly in the future.
-
-This may be seeded multiple times.
-
-```go
-node.Seed([]string{"10.26.104.52:9992", "10.26.104.56:7331"})
 ```
 
 ### Update our nodes state
