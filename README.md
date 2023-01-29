@@ -16,7 +16,7 @@ builds an eventually consistent view of the cluster. This state is exposed
 as a key-value store on each node, though typically apps will subscribe to
 updates about nodes joining, leaving and updating their state.
 
-The implementation is described in [docs/scuttlebutt.md](docs/scuttlebutt.md).
+The implementation is described in [docs/](docs/).
 
 **Note** this does not currently support detecting nodes leaving the cluster.
 Working on adding a [Phi Accrual Failure Detector](https://www.computer.org/csdl/proceedings-article/srds/2004/22390066/12OmNvT2phv)
