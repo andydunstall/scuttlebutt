@@ -96,6 +96,14 @@ remote node will then do its own round of gossip with another node and send it
 the latest version of peer `peer_9873`. So the update quickly propagates around
 the cluster.
 
+After node A has gossiped with a peer, it will check if there are any seed nodes
+it does not know about it. If so it will select one at random and send it
+a digest.
+
+Finally, the node checks the suspision level of each node. If any nodes are
+critical it sends a digest to those nodes. The status of each node is also
+updated (up or down).
+
 ## Digest Request
 Node A requests any state that node B has that it doesn't by sending a
 digest request.
