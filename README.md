@@ -1,28 +1,24 @@
 # Scuttlebutt
-
-A Go library that manages cluster membership and propagates node state using
-the [Scuttlebutt](https://www.cs.cornell.edu/home/rvr/papers/flowgossip.pdf)
+A Go library that facilitates cluster membership and state propagation using the
+[Scuttlebutt](https://www.cs.cornell.edu/home/rvr/papers/flowgossip.pdf)
 protocol.
 
-Scuttlebutt is an eventually consistent anti-entropy protocol based on gossip,
-described in [this paper](https://www.cs.cornell.edu/home/rvr/papers/flowgossip.pdf).
+The Scuttlebutt protocol is an eventually consistent, gossip-based anti-entropy
+mechanism, as described in [this paper](https://www.cs.cornell.edu/home/rvr/papers/flowgossip.pdf).
 
-The state of each node is simply a set of arbitrary key-value pairs set by the
-application. Such as it may include the node type, the node status and routing
-information for the node.
+The state of a node is represented by a set of application-defined key-value
+pairs, including the node type, status, and routing information.
 
-Each nodes state is propagated to all other nodes in the cluster, so a node
-builds an eventually consistent view of the cluster. This state is exposed
-as a key-value store on each node, though typically apps will subscribe to
-updates about nodes joining, leaving and updating their state.
+The state of each node is disseminated to all other nodes in the cluster,
+allowing each node to develop an eventually consistent view of the entire
+cluster. This state is presented as a key-value store on each node, but
+typically, applications subscribe to updates about node join/leave and state
+changes.
 
 The implementation is described in [docs/](docs/).
 
-**Note** this does not currently support detecting nodes leaving the cluster.
-Working on adding a [Phi Accrual Failure Detector](https://www.computer.org/csdl/proceedings-article/srds/2004/22390066/12OmNvT2phv)
-similar to Cassandra to detect failed nodes. Though even with the failure
-detector, apps may choose to also explicitly signal to other nodes that a node
-is leaving though the nodes state.
+**WIP**
+* Working on adding the failure detector described in [docs/](docs/)
 
 ## Usage
 The full API docs can be viewed with `go doc --all`.
