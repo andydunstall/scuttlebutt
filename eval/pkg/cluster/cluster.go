@@ -13,7 +13,7 @@ import (
 
 type Node struct {
 	ID       string
-	Gossiper *scuttlebutt.Gossip
+	Gossiper *scuttlebutt.Scuttlebutt
 }
 
 func (n *Node) KnownPeers() int {
