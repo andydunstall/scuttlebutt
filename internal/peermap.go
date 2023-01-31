@@ -49,15 +49,15 @@ func NewPeerMap(
 	}
 }
 
-// Peers returns the peer IDs of the peers known by this node (excluding
-// ourselves).
-func (m *PeerMap) Peers() []string {
+// PeerIDs returns the peer IDs of the peers known by this node. If includeLocal
+// is true the local node is included, otherwise it isn't.
+func (m *PeerMap) PeerIDs(includeLocal bool) []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	peers := []string{}
+	peers := make([]string, 0, len(m.peers))
 	for peerID, _ := range m.peers {
-		if peerID != m.peerID {
+		if includeLocal || peerID != m.peerID {
 			peers = append(peers, peerID)
 		}
 	}

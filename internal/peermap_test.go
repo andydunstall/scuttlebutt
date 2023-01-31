@@ -24,7 +24,7 @@ func TestPeerMap_UpdateLocal(t *testing.T) {
 	assert.Equal(t, uint64(1), e.Version)
 }
 
-func TestPeerMap_Peers(t *testing.T) {
+func TestPeerMap_PeersIDs(t *testing.T) {
 	pm := NewPeerMap("local-peer", "", nil, nil, nil, zap.NewNop())
 
 	pm.ApplyDeltas(Delta{
@@ -50,12 +50,12 @@ func TestPeerMap_Peers(t *testing.T) {
 	})
 
 	// Sort to make comparison easier.
-	peers := pm.Peers()
+	peers := pm.PeerIDs(true)
 	sort.Strings(peers)
 
 	// Should not include out local peer.
 	assert.Equal(t, []string{
-		"peer-1", "peer-3", "peer-4",
+		"local-peer", "peer-1", "peer-3", "peer-4",
 	}, peers)
 }
 
@@ -203,9 +203,9 @@ func TestPeerMap_ApplyDigest(t *testing.T) {
 		},
 	})
 	// Nodes could be processed in any order so sort first.
-	peers := pm.Peers()
+	peers := pm.PeerIDs(true)
 	sort.Strings(peers)
-	assert.Equal(t, []string{"peer-1", "peer-2", "peer-3"}, peers)
+	assert.Equal(t, []string{"local-peer", "peer-1", "peer-2", "peer-3"}, peers)
 
 	addr, ok := pm.Addr("peer-1")
 	assert.True(t, ok)

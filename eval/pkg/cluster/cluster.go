@@ -18,7 +18,7 @@ type Node struct {
 
 func (n *Node) KnownPeers() int {
 	// Add one to include itself.
-	return len(n.Gossiper.Peers()) + 1
+	return len(n.Gossiper.PeerIDs())
 }
 
 func (n *Node) DiscoveredNode(nodeID string) bool {
@@ -26,7 +26,7 @@ func (n *Node) DiscoveredNode(nodeID string) bool {
 		return true
 	}
 
-	for _, id := range n.Gossiper.Peers() {
+	for _, id := range n.Gossiper.PeerIDs() {
 		if nodeID == id {
 			return true
 		}
