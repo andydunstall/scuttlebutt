@@ -2,7 +2,6 @@ package scuttlebutt
 
 import (
 	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -13,8 +12,7 @@ import (
 // Scuttlebutt handles cluster membership using the scuttlebutt protocol.
 // This is thread safe.
 type Scuttlebutt struct {
-	peerMap        *internal.PeerMap
-	protocol       *internal.Protocol
+	gossiper       *internal.Gossiper
 	seedCB         func() []string
 	gossipInterval time.Duration
 	transport      internal.Transport
@@ -42,10 +40,10 @@ func Create(id string, addr string, options ...Option) (*Scuttlebutt, error) {
 	return g, nil
 }
 
-// Peers returns the peer IDs of the peers known by this node (including
+// Peers returns the IDs of the peers known by this node (including
 // ourselves).
 func (s *Scuttlebutt) PeerIDs() []string {
-	return s.peerMap.PeerIDs(true)
+	return s.gossiper.PeerIDs(true)
 }
 
 // Lookup looks up the given key in the known state of the peer with the given
@@ -53,24 +51,20 @@ func (s *Scuttlebutt) PeerIDs() []string {
 // to be up to date with the actual state of the peer, though should converge
 // quickly.
 func (s *Scuttlebutt) Lookup(peerID string, key string) (string, bool) {
-	e, ok := s.peerMap.Lookup(peerID, key)
-	if !ok {
-		return "", false
-	}
-	return e.Value, true
+	return s.gossiper.Lookup(peerID, key)
 }
 
 // UpdateLocal updates this nodes state with the given key-value pair. This will
 // be propagated to the other nodes in the cluster.
 func (s *Scuttlebutt) UpdateLocal(key string, value string) {
-	s.peerMap.UpdateLocal(key, value)
+	s.gossiper.UpdateLocal(key, value)
 }
 
 // BindAddr returns the address the transport listener is bound to. Note
 // this may be different from the configured bind addr if the system chooses
 // the addr (such as using a port of 0).
 func (s *Scuttlebutt) BindAddr() string {
-	return s.transport.BindAddr()
+	return s.gossiper.BindAddr()
 }
 
 // Shutdown closes all background networking and stops gossiping its state to
@@ -79,7 +73,7 @@ func (s *Scuttlebutt) Shutdown() error {
 	s.logger.Debug("shutdown")
 
 	// Note must close transport first or could block writing to packetCh.
-	err := s.transport.Shutdown()
+	err := s.gossiper.Close()
 	close(s.done)
 	s.wg.Wait()
 	return err
@@ -119,8 +113,7 @@ func newScuttlebutt(id string, addr string, opts *Options) (*Scuttlebutt, error)
 		opts.OnUpdate,
 		opts.Logger,
 	)
-	gossip.peerMap = peerMap
-	gossip.protocol = internal.NewProtocol(peerMap, opts.Logger)
+	gossip.gossiper = internal.NewGossiper(peerMap, transport, opts.Logger)
 
 	return gossip, nil
 }
@@ -147,20 +140,14 @@ func (s *Scuttlebutt) gossipLoop() {
 }
 
 func (s *Scuttlebutt) round() {
-	if len(s.peerMap.PeerIDs(false)) == 0 {
+	peerID, addr, ok := s.gossiper.RandomPeer()
+	if !ok {
 		// If we don't know about any other peers in the cluster re-seed.
 		s.seed()
 		return
 	}
 
-	// Scuttlebutt with a random peer.
-	peers := s.peerMap.PeerIDs(false)
-	peer := peers[rand.Intn(len(peers))]
-	addr, ok := s.peerMap.Addr(peer)
-	if !ok {
-		return
-	}
-	s.gossip(peer, addr)
+	s.gossiper.Gossip(peerID, addr)
 }
 
 func (s *Scuttlebutt) seed() {
@@ -169,51 +156,9 @@ func (s *Scuttlebutt) seed() {
 		return
 	}
 
-	seeds := s.seedCB()
-
-	s.logger.Debug("seeding gossiper", zap.Strings("seeds", seeds))
-
-	for _, addr := range seeds {
-		// Ignore ourselves.
-		if addr == s.BindAddr() {
-			continue
-		}
-		s.gossip("seed", addr)
-	}
+	s.gossiper.Seed(s.seedCB())
 }
 
 func (s *Scuttlebutt) onPacket(p *internal.Packet) {
-	responses, err := s.protocol.OnMessage(p.Buf)
-	if err != nil {
-		return
-	}
-	for _, b := range responses {
-		_, err := s.transport.WriteTo(b, p.From.String())
-		if err != nil {
-			s.logger.Error("failed to write to transport", zap.Error(err))
-			return
-		}
-	}
-}
-
-func (s *Scuttlebutt) gossip(id string, addr string) error {
-	s.logger.Debug(
-		"gossip with peer",
-		zap.String("id", id),
-		zap.String("addr", addr),
-	)
-
-	b, err := s.protocol.DigestRequest()
-	if err != nil {
-		s.logger.Error("failed to get digest reqeust", zap.Error(err))
-		return err
-	}
-
-	_, err = s.transport.WriteTo(b, addr)
-	if err != nil {
-		s.logger.Error("failed to write to transport", zap.Error(err))
-		return fmt.Errorf("failed to write to transport %s: %v", addr, err)
-	}
-
-	return nil
+	s.gossiper.OnMessage(p.Buf, p.From.String())
 }

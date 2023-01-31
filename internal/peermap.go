@@ -49,7 +49,7 @@ func NewPeerMap(
 	}
 }
 
-// PeerIDs returns the peer IDs of the peers known by this node. If includeLocal
+// PeerIDs returns the IDs of the peers known by this node. If includeLocal
 // is true the local node is included, otherwise it isn't.
 func (m *PeerMap) PeerIDs(includeLocal bool) []string {
 	m.mu.RLock()
