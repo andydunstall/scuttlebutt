@@ -19,14 +19,14 @@ const (
 // UDPTransport is a Transport implementation using UDP.
 type UDPTransport struct {
 	udpListener *net.UDPConn
-	packetCh    chan *Packet
+	onPacket    func(p *Packet)
 	wg          sync.WaitGroup
 	shutdown    int32
 	logger      *zap.Logger
 }
 
 // NewUDPTransport returns a new UDP transport listening on the given addr.
-func NewUDPTransport(bindAddr string, logger *zap.Logger) (Transport, error) {
+func NewUDPTransport(bindAddr string, onPacket func(p *Packet), logger *zap.Logger) (Transport, error) {
 	udpListener, err := udpListen(bindAddr)
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func NewUDPTransport(bindAddr string, logger *zap.Logger) (Transport, error) {
 
 	t := &UDPTransport{
 		udpListener: udpListener,
-		packetCh:    make(chan *Packet),
+		onPacket:    onPacket,
 		wg:          sync.WaitGroup{},
 		shutdown:    0,
 		logger:      logger,
@@ -58,10 +58,6 @@ func (t *UDPTransport) WriteTo(b []byte, addr string) (time.Time, error) {
 		return time.Now(), nil
 	}
 	return time.Now(), err
-}
-
-func (t *UDPTransport) PacketCh() <-chan *Packet {
-	return t.packetCh
 }
 
 func (t *UDPTransport) BindAddr() string {
@@ -106,11 +102,11 @@ func (t *UDPTransport) udpReadLoop(lis *net.UDPConn) {
 			continue
 		}
 
-		t.packetCh <- &Packet{
+		t.onPacket(&Packet{
 			Buf:       buf[:n],
 			From:      addr,
 			Timestamp: ts,
-		}
+		})
 	}
 }
 

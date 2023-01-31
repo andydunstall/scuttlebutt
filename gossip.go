@@ -92,11 +92,20 @@ func newGossip(id string, addr string, opts *Options) (*Gossip, error) {
 		return nil, fmt.Errorf("node id too large (cannot exceed 256 bytes)")
 	}
 
-	transport, err := internal.NewUDPTransport(addr, opts.Logger)
+	gossip := &Gossip{
+		seedCB:         opts.SeedCB,
+		gossipInterval: opts.Interval,
+		done:           make(chan struct{}),
+		wg:             sync.WaitGroup{},
+		logger:         opts.Logger,
+	}
+
+	transport, err := internal.NewUDPTransport(addr, gossip.onPacket, opts.Logger)
 	if err != nil {
 		opts.Logger.Error("failed to start transport", zap.Error(err))
 		return nil, err
 	}
+	gossip.transport = transport
 
 	opts.Logger.Debug("transport started", zap.String("addr", transport.BindAddr()))
 
@@ -110,17 +119,10 @@ func newGossip(id string, addr string, opts *Options) (*Gossip, error) {
 		opts.OnUpdate,
 		opts.Logger,
 	)
+	gossip.peerMap = peerMap
+	gossip.protocol = internal.NewProtocol(peerMap, opts.Logger)
 
-	return &Gossip{
-		peerMap:        peerMap,
-		protocol:       internal.NewProtocol(peerMap, opts.Logger),
-		seedCB:         opts.SeedCB,
-		gossipInterval: opts.Interval,
-		transport:      transport,
-		done:           make(chan struct{}),
-		wg:             sync.WaitGroup{},
-		logger:         opts.Logger,
-	}, nil
+	return gossip, nil
 }
 
 func (g *Gossip) schedule() {
@@ -136,8 +138,6 @@ func (g *Gossip) gossipLoop() {
 
 	for {
 		select {
-		case packet := <-g.transport.PacketCh():
-			g.onPacket(packet)
 		case <-ticker.C:
 			g.round()
 		case <-g.done:
