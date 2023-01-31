@@ -29,11 +29,6 @@ type Transport interface {
 	// was transmitted to help make accurate RTT measurements during probes.
 	WriteTo(b []byte, addr string) (time.Time, error)
 
-	// PacketCh returns a channel that can be read to receive incoming
-	// packets from other peers. How this is set up for listening is left as
-	// an exercise for the concrete transport implementations.
-	PacketCh() <-chan *Packet
-
 	// BindAddr returns the address the transport listener is bound to. Note
 	// this may be different from the configured bind addr if the system chooses
 	// the addr (such as using a port of 0).
