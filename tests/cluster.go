@@ -60,16 +60,16 @@ func (s *NodeSubscriber) WaitPeerJoinedWithTimeout(t time.Duration) (string, boo
 }
 
 type Cluster struct {
-	nodes map[string]*scuttlebutt.Gossip
+	nodes map[string]*scuttlebutt.Scuttlebutt
 }
 
 func NewCluster() *Cluster {
 	return &Cluster{
-		nodes: make(map[string]*scuttlebutt.Gossip),
+		nodes: make(map[string]*scuttlebutt.Scuttlebutt),
 	}
 }
 
-func (c *Cluster) AddNode(peerID string, nodeSub *NodeSubscriber) (*scuttlebutt.Gossip, error) {
+func (c *Cluster) AddNode(peerID string, nodeSub *NodeSubscriber) (*scuttlebutt.Scuttlebutt, error) {
 	opts := []scuttlebutt.Option{
 		scuttlebutt.WithSeedCB(func() []string {
 			return c.Seeds()
