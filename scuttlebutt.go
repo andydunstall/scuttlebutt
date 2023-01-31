@@ -42,10 +42,10 @@ func Create(id string, addr string, options ...Option) (*Scuttlebutt, error) {
 	return g, nil
 }
 
-// Peers returns the peer IDs of the peers known by this node (excluding
+// Peers returns the peer IDs of the peers known by this node (including
 // ourselves).
-func (s *Scuttlebutt) Peers() []string {
-	return s.peerMap.Peers()
+func (s *Scuttlebutt) PeerIDs() []string {
+	return s.peerMap.PeerIDs(true)
 }
 
 // Lookup looks up the given key in the known state of the peer with the given
@@ -147,14 +147,14 @@ func (s *Scuttlebutt) gossipLoop() {
 }
 
 func (s *Scuttlebutt) round() {
-	if len(s.peerMap.Peers()) == 0 {
+	if len(s.peerMap.PeerIDs(false)) == 0 {
 		// If we don't know about any other peers in the cluster re-seed.
 		s.seed()
 		return
 	}
 
 	// Scuttlebutt with a random peer.
-	peers := s.peerMap.Peers()
+	peers := s.peerMap.PeerIDs(false)
 	peer := peers[rand.Intn(len(peers))]
 	addr, ok := s.peerMap.Addr(peer)
 	if !ok {
