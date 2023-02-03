@@ -109,33 +109,6 @@ as the time it takes to propagate an update to all nodes in a cluster with
 64 nodes.
 
 ## Future Improvements
-This is only a fairly simple implementation so far, which is functional though
-theres lots that could be done to improve:
-
-### Limit Messages to MTU
-Currently the protocol uses UDP but has no limits on the packet size. To support
-this:
-* At the moment assume if a peer isn't in a digest, the sender doesn't know
-about that peer, though if we're limiting what can go in the digest this will
-no longer be the case. This should be fine as if the sender doesn't know about
-the peer, it will learn about it when the receiver responds with it's own
-digest (though may require another gossip round)
-* Limit the size of digests to fit in the MTU, either by randomly selecting
-a subset of peers to include, or sending a digest split over multiple messages
-each gossip round
-* Limit the size of the deltas to fit in the MTU, which the paper recommends
-including the most out of date deltas relative to the requested digest (by
-comparing versions)
-
-### Binary Protocol
-At the moment everything is encoded with JSON which is not very efficient (both
-in time to encode and space). Given payloads are quite simple a binary protocol
-that includes a header with the message type and a sequence of digest/delta
-entries should be easy and efficient.
-
-This will also help limitting messages to the MTU as we can just keep adding
-digests/deltas (ordered by preference) to the message until adding another would
-exceed the limit.
 
 ### Configuration
 Adding default configuration would be useful, similar to memberlists `DefaultLAN`
@@ -144,7 +117,7 @@ and `DefaultWAN` config.
 Also being able to configure the initial state for the node before it joins the
 cluster.
 
-### Phi-accrual failure detector
+### Failure Detector
 Currently its left to the application to detect failed nodes, though this could
 be done within the library itself.
 

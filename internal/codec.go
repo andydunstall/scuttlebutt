@@ -1,127 +1,147 @@
 package internal
 
 import (
-	"encoding/json"
-	"fmt"
+	"encoding/binary"
 )
 
 type messageType uint8
 
 const (
-	typeDigestRequest  messageType = 0
-	typeDigestResponse messageType = 1
-	typeDelta          messageType = 2
-
 	MaxNodeIDSize = 0xff
+
+	typeDigestRequest  messageType = 1
+	typeDigestResponse messageType = 2
+	typeDelta          messageType = 3
+
+	uint8Len  = 1
+	uint64Len = 8
 )
 
-type codec struct{}
+func encodeUint8(buf []byte, offset int, n uint8) int {
+	if len(buf) < offset+uint8Len {
+		panic("buf too small; cannot encode uint8")
+	}
 
-func newCodec() *codec {
-	return &codec{}
+	buf[offset] = byte(n)
+	return offset + uint8Len
 }
 
-func (c *codec) Encode(mType messageType, v interface{}) ([]byte, error) {
-	switch mType {
-	case typeDigestRequest:
-		d, ok := v.(*Digest)
-		if !ok {
-			return nil, fmt.Errorf("digest expected")
-		}
-		return c.encodeDigest("digest-request", d)
-	case typeDigestResponse:
-		d, ok := v.(*Digest)
-		if !ok {
-			return nil, fmt.Errorf("digest expected")
-		}
-		return c.encodeDigest("digest-response", d)
-	case typeDelta:
-		d, ok := v.(*Delta)
-		if !ok {
-			return nil, fmt.Errorf("delta expected")
-		}
-		return c.encodeDelta(d)
-	default:
-		return nil, fmt.Errorf("unknown type")
+func encodeUint64(buf []byte, offset int, n uint64) int {
+	if len(buf) < offset+uint64Len {
+		panic("buf too small; cannot encode uint64")
 	}
+
+	binary.BigEndian.PutUint64(buf[offset:offset+uint64Len], n)
+	return offset + uint64Len
 }
 
-func (c *codec) DecodeType(b []byte) (messageType, error) {
-	var m message
-	if err := json.Unmarshal(b, &m); err != nil {
-		return 0, fmt.Errorf("failed to decode message type: %v", err)
+func encodeString(buf []byte, offset int, s string) int {
+	if len(buf) < offset+len(s) {
+		panic("buf too small; cannot encode bytes")
+	}
+	if len(s) > 0xff {
+		panic("string too large; cannot exceed 256 bytes")
 	}
 
-	switch m.Type {
-	case "digest-request":
-		return typeDigestRequest, nil
-	case "digest-response":
-		return typeDigestResponse, nil
-	case "delta":
-		return typeDelta, nil
-	default:
-		return 0, fmt.Errorf("failed to decode message type: unrecognised type: %s", m.Type)
+	offset = encodeUint8(buf, offset, uint8(len(s)))
+	for i := 0; i != len(s); i++ {
+		buf[offset+i] = s[i]
 	}
+	offset += len(s)
+	return offset
 }
 
-func (c *codec) Decode(b []byte, v interface{}) error {
-	t, err := c.DecodeType(b)
-	if err != nil {
-		return err
-	}
+func encodeDigest(d Digest) []byte {
+	payloadLen := uint8Len + len(d.ID) + uint8Len + len(d.Addr) + uint64Len
 
-	var m message
-	if err := json.Unmarshal(b, &m); err != nil {
-		return fmt.Errorf("failed to decode message: invalid format: %v", err)
-	}
+	b := make([]byte, payloadLen)
+	offset := encodeString(b, 0, d.ID)
+	offset = encodeString(b, offset, d.Addr)
+	encodeUint64(b, offset, d.Version)
 
-	switch t {
-	case typeDigestRequest:
-		d, ok := v.(*Digest)
-		if !ok {
-			return fmt.Errorf("failed to decode message: digest expected")
-		}
-		*d = *m.Digest
-		return nil
-	case typeDigestResponse:
-		d, ok := v.(*Digest)
-		if !ok {
-			return fmt.Errorf("failed to decode message: digest expected")
-		}
-		*d = *m.Digest
-		return nil
-	case typeDelta:
-		d, ok := v.(*Delta)
-		if !ok {
-			return fmt.Errorf("failed to decode message: delta expected")
-		}
-		*d = *m.Delta
-		return nil
-	default:
-		return fmt.Errorf("failed to decode message: unrecognised type: %d", t)
-	}
+	return b
 }
 
-func (c *codec) encodeDigest(mType string, d *Digest) ([]byte, error) {
-	m := message{
-		Type:   mType,
-		Digest: d,
-	}
-	b, err := json.Marshal(&m)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode digest: %v", err)
-	}
-	return b, nil
+func encodeDelta(d Delta) []byte {
+	payloadLen := uint8Len + len(d.ID) + uint8Len + len(d.Key) + uint8Len + len(d.Value) + uint64Len
+
+	b := make([]byte, payloadLen)
+	offset := encodeString(b, 0, d.ID)
+	offset = encodeString(b, offset, d.Key)
+	offset = encodeString(b, offset, d.Value)
+	encodeUint64(b, offset, d.Version)
+
+	return b
 }
 
-func (c *codec) encodeDelta(d *Delta) ([]byte, error) {
-	m := message{
-		Type:  "delta",
-		Delta: d,
+func decodeUint8(buf []byte, offset int) (uint8, int) {
+	if len(buf) < offset+uint8Len {
+		panic("buf too small; cannot decode uint8")
 	}
-	b, err := json.Marshal(&m)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode delta: %v", err)
+
+	n := uint8(buf[offset])
+	return n, offset + uint8Len
+}
+
+func decodeUint64(buf []byte, offset int) (uint64, int) {
+	if len(buf) < offset+uint64Len {
+		panic("buf too small; cannot decode uint64")
 	}
-	return b, nil
+
+	n := binary.BigEndian.Uint64(buf[offset : offset+uint64Len])
+	return n, offset + uint64Len
+}
+
+func decodeString(buf []byte, offset int) (string, int) {
+	n, offset := decodeUint8(buf, offset)
+	if len(buf) < offset+int(n) {
+		panic("buf too small; cannot decode string")
+	}
+	return string(buf[offset : offset+int(n)]), offset + int(n)
+}
+
+func decodeDigest(b []byte, offset int) (Digest, int) {
+	id, offset := decodeString(b, offset)
+	addr, offset := decodeString(b, offset)
+	version, offset := decodeUint64(b, offset)
+	return Digest{
+		ID:      id,
+		Addr:    addr,
+		Version: version,
+	}, offset
+}
+
+func decodeDigestSync(b []byte) []Digest {
+	sync := []Digest{}
+	offset := 0
+	for offset < len(b) {
+		var digest Digest
+		digest, offset = decodeDigest(b, offset)
+		sync = append(sync, digest)
+	}
+	return sync
+}
+
+func decodeDelta(b []byte, offset int) (Delta, int) {
+	id, offset := decodeString(b, offset)
+	key, offset := decodeString(b, offset)
+	value, offset := decodeString(b, offset)
+	version, offset := decodeUint64(b, offset)
+	return Delta{
+		ID:      id,
+		Key:     key,
+		Value:   value,
+		Version: version,
+	}, offset
+}
+
+func decodeDeltaSync(b []byte) []Delta {
+	sync := []Delta{}
+	offset := 0
+	for offset < len(b) {
+		var delta Delta
+		delta, offset = decodeDelta(b, offset)
+		sync = append(sync, delta)
+	}
+	return sync
 }

@@ -101,7 +101,8 @@ func TestPeer_UpdateRemoteDiscardsOldVersion(t *testing.T) {
 
 func TestPeer_Digest(t *testing.T) {
 	p := NewPeer("my-peer", "10.26.104.52:8119")
-	assert.Equal(t, PeerDigest{
+	assert.Equal(t, Digest{
+		ID:      "my-peer",
 		Addr:    "10.26.104.52:8119",
 		Version: 0,
 	}, p.Digest())
@@ -117,32 +118,23 @@ func TestPeer_Deltas(t *testing.T) {
 	p.UpdateRemote("g", "h", 9)
 
 	// Expect a version of 0 to include all entries.
-	expectedSince0 := PeerDelta{
-		Addr: "10.26.104.52:8119",
-		Deltas: []DeltaEntry{
-			{Key: "a", Value: "b", Version: 1},
-			{Key: "c", Value: "d", Version: 3},
-			{Key: "e", Value: "f", Version: 7},
-			{Key: "g", Value: "h", Version: 9},
-		},
+	expectedSince0 := []Delta{
+		{ID: "my-peer", Key: "a", Value: "b", Version: 1},
+		{ID: "my-peer", Key: "c", Value: "d", Version: 3},
+		{ID: "my-peer", Key: "e", Value: "f", Version: 7},
+		{ID: "my-peer", Key: "g", Value: "h", Version: 9},
 	}
 	assert.Equal(t, expectedSince0, p.Deltas(0))
 
 	// A version of 3 should only returns entries with greater versions.
-	expectedSince3 := PeerDelta{
-		Addr: "10.26.104.52:8119",
-		Deltas: []DeltaEntry{
-			{Key: "e", Value: "f", Version: 7},
-			{Key: "g", Value: "h", Version: 9},
-		},
+	expectedSince3 := []Delta{
+		{ID: "my-peer", Key: "e", Value: "f", Version: 7},
+		{ID: "my-peer", Key: "g", Value: "h", Version: 9},
 	}
 	assert.Equal(t, expectedSince3, p.Deltas(3))
 
 	// A version of 10 should return no entries as we have no entries with
 	// a version greater than 10.
-	expectedSince10 := PeerDelta{
-		Addr:   "10.26.104.52:8119",
-		Deltas: []DeltaEntry{},
-	}
+	expectedSince10 := []Delta{}
 	assert.Equal(t, expectedSince10, p.Deltas(10))
 }

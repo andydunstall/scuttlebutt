@@ -27,361 +27,67 @@ func TestPeerMap_UpdateLocal(t *testing.T) {
 func TestPeerMap_PeersIDs(t *testing.T) {
 	pm := NewPeerMap("local-peer", "", nil, nil, nil, zap.NewNop())
 
-	pm.ApplyDeltas(Delta{
-		"peer-1": PeerDelta{
-			Addr: "10.26.104.52:1001",
-			Deltas: []DeltaEntry{
-				{Key: "a", Value: "1", Version: 12},
-				{Key: "b", Value: "2", Version: 14},
-			},
-		},
-		"peer-3": PeerDelta{
-			Addr: "10.26.104.52:1003",
-			Deltas: []DeltaEntry{
-				{Key: "c", Value: "3", Version: 15},
-			},
-		},
-		"peer-4": PeerDelta{
-			Addr: "10.26.104.52:1004",
-			Deltas: []DeltaEntry{
-				{Key: "d", Value: "4", Version: 2},
-			},
-		},
+	pm.ApplyDigest(Digest{
+		ID:      "peer-1",
+		Addr:    "10.26.104.11:8119",
+		Version: 12,
+	})
+	pm.ApplyDigest(Digest{
+		ID:      "peer-3",
+		Addr:    "10.26.104.12:8119",
+		Version: 15,
+	})
+	pm.ApplyDigest(Digest{
+		ID:      "peer-4",
+		Addr:    "10.26.104.13:8119",
+		Version: 2,
 	})
 
+	allPeers := pm.PeerIDs(true)
 	// Sort to make comparison easier.
-	peers := pm.PeerIDs(true)
-	sort.Strings(peers)
-
-	// Should not include out local peer.
+	sort.Strings(allPeers)
+	// Should include the local peer.
 	assert.Equal(t, []string{
 		"local-peer", "peer-1", "peer-3", "peer-4",
-	}, peers)
+	}, allPeers)
+
+	remotePeers := pm.PeerIDs(false)
+	// Sort to make comparison easier.
+	sort.Strings(remotePeers)
+	// Should not include the local peer.
+	assert.Equal(t, []string{
+		"peer-1", "peer-3", "peer-4",
+	}, remotePeers)
 }
 
-func TestPeerMap_Digest(t *testing.T) {
-	pm := NewPeerMap("local-peer", "10.26.104.52:1000", nil, nil, nil, zap.NewNop())
+// Tests two random peer maps that exchange digests and deltas should have the
+// same peer state.
+func TestPeerMap_SyncState(t *testing.T) {
+	map1 := randomPeerMap(5, 3)
+	map2 := randomPeerMap(5, 3)
 
-	pm.ApplyDeltas(Delta{
-		"peer-1": PeerDelta{
-			Addr: "10.26.104.52:1001",
-			Deltas: []DeltaEntry{
-				{Key: "a", Value: "1", Version: 12},
-				{Key: "b", Value: "2", Version: 14},
-			},
-		},
-		"peer-3": PeerDelta{
-			Addr: "10.26.104.52:1003",
-			Deltas: []DeltaEntry{
-				{Key: "c", Value: "3", Version: 15},
-			},
-		},
-		"peer-4": PeerDelta{
-			Addr: "10.26.104.52:1004",
-			Deltas: []DeltaEntry{
-				{Key: "d", Value: "4", Version: 2},
-			},
-		},
-	})
+	assert.False(t, map1.PeersEqual(map2))
 
-	expected := Digest{
-		"local-peer": PeerDigest{
-			Addr:    "10.26.104.52:1000",
-			Version: 0,
-		},
-		"peer-1": PeerDigest{
-			Addr:    "10.26.104.52:1001",
-			Version: 14,
-		},
-		"peer-3": PeerDigest{
-			Addr:    "10.26.104.52:1003",
-			Version: 15,
-		},
-		"peer-4": PeerDigest{
-			Addr:    "10.26.104.52:1004",
-			Version: 2,
-		},
+	for _, peerID := range map1.PeerIDs(true) {
+		map2.ApplyDigest(map1.Digest(peerID))
+	}
+	for _, peerID := range map2.PeerIDs(true) {
+		map1.ApplyDigest(map2.Digest(peerID))
 	}
 
-	actual := pm.Digest()
-	assert.Equal(t, expected, actual)
-}
-
-func TestPeerMap_Deltas(t *testing.T) {
-	pm := NewPeerMap("local-peer", "10.26.104.52:1000", nil, nil, nil, zap.NewNop())
-
-	pm.ApplyDeltas(Delta{
-		"peer-1": PeerDelta{
-			Addr: "10.26.104.52:1001",
-			Deltas: []DeltaEntry{
-				{Key: "a", Value: "1", Version: 12},
-				{Key: "b", Value: "2", Version: 14},
-			},
-		},
-		"peer-2": PeerDelta{
-			Addr: "10.26.104.52:1002",
-			Deltas: []DeltaEntry{
-				{Key: "c", Value: "3", Version: 5},
-				{Key: "d", Value: "4", Version: 21},
-			},
-		},
-		"peer-3": PeerDelta{
-			Addr: "10.26.104.52:1003",
-			Deltas: []DeltaEntry{
-				{Key: "e", Value: "5", Version: 13},
-				{Key: "f", Value: "6", Version: 15},
-			},
-		},
-		"peer-4": PeerDelta{
-			Addr: "10.26.104.52:1004",
-			Deltas: []DeltaEntry{
-				{Key: "g", Value: "7", Version: 2},
-			},
-		},
-	})
-
-	actual := pm.Deltas(Digest{
-		// Version lower than all peer 1's entries.
-		"peer-1": PeerDigest{
-			Addr:    "10.26.104.52:1001",
-			Version: 10,
-		},
-		// Version higher than all peer 2's entries.
-		"peer-2": PeerDigest{
-			Addr:    "10.26.104.52:1002",
-			Version: 33,
-		},
-		// Version higher than half peer 3's entries.
-		"peer-3": PeerDigest{
-			Addr:    "10.26.104.52:1003",
-			Version: 14,
-		},
-		// Not including peer-4 so should be implicitly treated as 0 and
-		// include all entries.
-	})
-
-	expected := Delta{
-		"peer-1": PeerDelta{
-			Addr: "10.26.104.52:1001",
-			Deltas: []DeltaEntry{
-				{Key: "a", Value: "1", Version: 12},
-				{Key: "b", Value: "2", Version: 14},
-			},
-		},
-		"peer-3": PeerDelta{
-			Addr: "10.26.104.52:1003",
-			Deltas: []DeltaEntry{
-				{Key: "f", Value: "6", Version: 15},
-			},
-		},
-		"peer-4": PeerDelta{
-			Addr: "10.26.104.52:1004",
-			Deltas: []DeltaEntry{
-				{Key: "g", Value: "7", Version: 2},
-			},
-		},
+	for _, peerID := range map1.PeerIDs(true) {
+		deltas := map1.Deltas(peerID, map2.Version(peerID))
+		for _, delta := range deltas {
+			map2.ApplyDelta(delta)
+		}
 	}
-	assert.Equal(t, expected, actual)
-}
 
-func TestPeerMap_ApplyDigest(t *testing.T) {
-	pm := NewPeerMap("local-peer", "10.26.104.52:1000", nil, nil, nil, zap.NewNop())
-
-	// Add peers and check the callback is fired.
-	pm.ApplyDigest(Digest{
-		"peer-1": PeerDigest{
-			Addr:    "10.26.104.52:1001",
-			Version: 14,
-		},
-		"peer-2": PeerDigest{
-			Addr:    "10.26.104.52:1002",
-			Version: 15,
-		},
-		"peer-3": PeerDigest{
-			Addr:    "10.26.104.52:1003",
-			Version: 2,
-		},
-	})
-	// Nodes could be processed in any order so sort first.
-	peers := pm.PeerIDs(true)
-	sort.Strings(peers)
-	assert.Equal(t, []string{"local-peer", "peer-1", "peer-2", "peer-3"}, peers)
-
-	addr, ok := pm.Addr("peer-1")
-	assert.True(t, ok)
-	assert.Equal(t, "10.26.104.52:1001", addr)
-}
-
-func TestPeerMap_ApplyDeltasUpdateRemote(t *testing.T) {
-	pm := NewPeerMap("local-peer", "", nil, nil, nil, zap.NewNop())
-
-	pm.ApplyDeltas(Delta{
-		"peer-1": PeerDelta{
-			Addr: "10.26.104.52:1001",
-			Deltas: []DeltaEntry{
-				{Key: "a", Value: "1", Version: 12},
-				{Key: "b", Value: "2", Version: 14},
-			},
-		},
-		"peer-3": PeerDelta{
-			Addr: "10.26.104.52:1003",
-			Deltas: []DeltaEntry{
-				{Key: "c", Value: "3", Version: 15},
-			},
-		},
-		"peer-4": PeerDelta{
-			Addr: "10.26.104.52:1004",
-			Deltas: []DeltaEntry{
-				{Key: "d", Value: "4", Version: 2},
-			},
-		},
-	})
-
-	// Check the peers were updated.
-
-	entry, ok := pm.Lookup("peer-1", "a")
-	assert.True(t, ok)
-	assert.Equal(t, "1", entry.Value)
-	assert.Equal(t, uint64(12), entry.Version)
-
-	entry, ok = pm.Lookup("peer-1", "b")
-	assert.True(t, ok)
-	assert.Equal(t, "2", entry.Value)
-	assert.Equal(t, uint64(14), entry.Version)
-
-	entry, ok = pm.Lookup("peer-3", "c")
-	assert.True(t, ok)
-	assert.Equal(t, "3", entry.Value)
-	assert.Equal(t, uint64(15), entry.Version)
-
-	entry, ok = pm.Lookup("peer-4", "d")
-	assert.True(t, ok)
-	assert.Equal(t, "4", entry.Value)
-	assert.Equal(t, uint64(2), entry.Version)
-}
-
-func TestPeerMap_ApplyDeltasIgnoreUpdatesAboutLocalPeer(t *testing.T) {
-	pm := NewPeerMap("local-peer", "10.26.104.52:1000", nil, nil, nil, zap.NewNop())
-
-	pm.ApplyDeltas(Delta{
-		"local-peer": PeerDelta{
-			Addr: "10.26.104.52:1000",
-			Deltas: []DeltaEntry{
-				{Key: "foo", Value: "bar", Version: 12},
-			},
-		},
-	})
-
-	// The entry should not be found as should not have been updated.
-	_, ok := pm.Lookup("local-peer", "foo")
-	assert.False(t, ok)
-}
-
-func TestPeerMap_SubscribeToNodeJoinedFromDigest(t *testing.T) {
-	nodesJoined := []string{}
-
-	onJoin := func(peerID string) {
-		nodesJoined = append(nodesJoined, peerID)
+	for _, peerID := range map2.PeerIDs(true) {
+		deltas := map2.Deltas(peerID, map1.Version(peerID))
+		for _, delta := range deltas {
+			map1.ApplyDelta(delta)
+		}
 	}
-	pm := NewPeerMap("local-peer", "10.26.104.52:1000", onJoin, nil, nil, zap.NewNop())
 
-	// Add peers and check the callback is fired.
-	pm.ApplyDigest(Digest{
-		"peer-1": PeerDigest{
-			Addr:    "10.26.104.52:1001",
-			Version: 14,
-		},
-		"peer-2": PeerDigest{
-			Addr:    "10.26.104.52:1002",
-			Version: 15,
-		},
-		"peer-3": PeerDigest{
-			Addr:    "10.26.104.52:1003",
-			Version: 2,
-		},
-	})
-	// Nodes could be processed in any order so sort first.
-	sort.Strings(nodesJoined)
-	assert.Equal(t, []string{"peer-1", "peer-2", "peer-3"}, nodesJoined)
-}
-
-func TestPeerMap_SubscribeToNodeJoinedFromDelta(t *testing.T) {
-	nodesJoined := []string{}
-
-	onJoin := func(peerID string) {
-		nodesJoined = append(nodesJoined, peerID)
-	}
-	pm := NewPeerMap("local-peer", "10.26.104.52:1000", onJoin, nil, nil, zap.NewNop())
-
-	// Add peers and check the callback is fired.
-	pm.ApplyDeltas(Delta{
-		"peer-1": PeerDelta{
-			Addr: "10.26.104.52:1001",
-			Deltas: []DeltaEntry{
-				{Key: "a", Value: "1", Version: 12},
-				{Key: "b", Value: "2", Version: 14},
-			},
-		},
-		"peer-2": PeerDelta{
-			Addr: "10.26.104.52:1002",
-			Deltas: []DeltaEntry{
-				{Key: "c", Value: "3", Version: 15},
-			},
-		},
-		"peer-3": PeerDelta{
-			Addr: "10.26.104.52:1003",
-			Deltas: []DeltaEntry{
-				{Key: "d", Value: "4", Version: 2},
-			},
-		},
-	})
-	// Nodes could be processed in any order so sort first.
-	sort.Strings(nodesJoined)
-	assert.Equal(t, []string{"peer-1", "peer-2", "peer-3"}, nodesJoined)
-}
-
-func TestPeerMap_SubscribeToPeerUpdated(t *testing.T) {
-	peerUpdates := []peerUpdate{}
-
-	onUpdate := func(peerID string, key string, value string) {
-		peerUpdates = append(peerUpdates, peerUpdate{
-			PeerID: peerID,
-			Key:    key,
-			Value:  value,
-		})
-	}
-	pm := NewPeerMap("local-peer", "10.26.104.52:1000", nil, nil, onUpdate, zap.NewNop())
-
-	// Add peers and check the callback is fired.
-	pm.ApplyDeltas(Delta{
-		"peer-1": PeerDelta{
-			Addr: "10.26.104.52:1001",
-			Deltas: []DeltaEntry{
-				{Key: "a", Value: "1", Version: 12},
-				{Key: "b", Value: "2", Version: 14},
-			},
-		},
-		"peer-2": PeerDelta{
-			Addr: "10.26.104.52:1002",
-			Deltas: []DeltaEntry{
-				{Key: "c", Value: "3", Version: 15},
-			},
-		},
-		"peer-3": PeerDelta{
-			Addr: "10.26.104.52:1003",
-			Deltas: []DeltaEntry{
-				{Key: "d", Value: "4", Version: 2},
-			},
-		},
-	})
-	// Nodes could be processed in any order so sort first.
-	sort.Slice(peerUpdates, func(i, j int) bool {
-		return peerUpdates[i].PeerID < peerUpdates[j].PeerID
-	})
-	assert.Equal(t, []peerUpdate{
-		peerUpdate{PeerID: "peer-1", Key: "a", Value: "1"},
-		peerUpdate{PeerID: "peer-1", Key: "b", Value: "2"},
-		peerUpdate{PeerID: "peer-2", Key: "c", Value: "3"},
-		peerUpdate{PeerID: "peer-3", Key: "d", Value: "4"},
-	}, peerUpdates)
+	assert.True(t, map1.PeersEqual(map2))
 }

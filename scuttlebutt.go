@@ -113,7 +113,9 @@ func newScuttlebutt(id string, addr string, opts *Options) (*Scuttlebutt, error)
 		opts.OnUpdate,
 		opts.Logger,
 	)
-	gossip.gossiper = internal.NewGossiper(peerMap, transport, opts.Logger)
+	gossip.gossiper = internal.NewGossiper(
+		peerMap, transport, opts.MaxMessageSize, opts.Logger,
+	)
 
 	return gossip, nil
 }
@@ -140,14 +142,14 @@ func (s *Scuttlebutt) gossipLoop() {
 }
 
 func (s *Scuttlebutt) round() {
-	peerID, addr, ok := s.gossiper.RandomPeer()
+	_, addr, ok := s.gossiper.RandomPeer()
 	if !ok {
 		// If we don't know about any other peers in the cluster re-seed.
 		s.seed()
 		return
 	}
 
-	s.gossiper.Gossip(peerID, addr)
+	s.gossiper.SendDigestRequest(addr)
 }
 
 func (s *Scuttlebutt) seed() {
