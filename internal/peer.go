@@ -118,8 +118,9 @@ func (p *Peer) UpdateRemote(key string, value string, version uint64) {
 	}
 }
 
-func (p *Peer) Digest() PeerDigest {
-	return PeerDigest{
+func (p *Peer) Digest() Digest {
+	return Digest{
+		ID:      p.peerID,
 		Addr:    p.addr,
 		Version: p.version,
 	}
@@ -128,30 +129,27 @@ func (p *Peer) Digest() PeerDigest {
 // Deltas returns all entries whos versions exceed the given version, ordered
 // by version.
 //
-// Note ordering deltas by version (per peer) is important since the full
-// delta may not be sent - and we can't have gaps in versions.
-func (p *Peer) Deltas(version uint64) PeerDelta {
-	deltas := []DeltaEntry{}
+// Note the deltas are ordered by version since the full all deltas may not be
+// sent and we can't have gaps in versions.
+func (p *Peer) Deltas(version uint64) []Delta {
+	deltas := []Delta{}
 	for key, entry := range p.entries {
 		if entry.Version <= version {
 			continue
 		}
 
-		deltas = append(deltas, DeltaEntry{
+		deltas = append(deltas, Delta{
+			ID:      p.peerID,
 			Key:     key,
 			Value:   entry.Value,
 			Version: entry.Version,
 		})
 	}
 
-	// Sort by version. There may be a more efficient way to store this but
-	// for now sorting is fine.
+	// Sort by version.
 	sort.Slice(deltas, func(i, j int) bool {
 		return deltas[i].Version < deltas[j].Version
 	})
 
-	return PeerDelta{
-		Addr:   p.addr,
-		Deltas: deltas,
-	}
+	return deltas
 }

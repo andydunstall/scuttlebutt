@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	DefaultInterval = time.Millisecond * 500
+	DefaultMaxMessageSize = 512
+	DefaultInterval       = time.Millisecond * 500
 )
 
 type Options struct {
@@ -25,6 +26,11 @@ type Options struct {
 
 	// OnUpdate is invoked when a peers state is updated.
 	OnUpdate func(peerID string, key string, value string)
+
+	// MaxMessageSize is the maximum allowed UDP payload for gossip messages.
+	// If the MTU is known this should be increased to the maximum size. If not
+	// set default to 512 bytes.
+	MaxMessageSize int
 
 	// Interval is the time between gossip rounds, when the node selects
 	// a random peer to sync with.
@@ -60,6 +66,12 @@ func WithOnUpdate(cb func(peerID string, key string, value string)) Option {
 	}
 }
 
+func WithMaxMessageSize(size int) Option {
+	return func(opts *Options) {
+		opts.MaxMessageSize = size
+	}
+}
+
 func WithInterval(interval time.Duration) Option {
 	return func(opts *Options) {
 		opts.Interval = interval
@@ -73,12 +85,14 @@ func WithLogger(logger *zap.Logger) Option {
 }
 
 func defaultOptions() *Options {
+	l, _ := zap.NewDevelopment()
 	return &Options{
-		SeedCB:   nil,
-		OnJoin:   nil,
-		OnLeave:  nil,
-		OnUpdate: nil,
-		Interval: DefaultInterval,
-		Logger:   zap.NewNop(),
+		SeedCB:         nil,
+		OnJoin:         nil,
+		OnLeave:        nil,
+		OnUpdate:       nil,
+		MaxMessageSize: DefaultMaxMessageSize,
+		Interval:       DefaultInterval,
+		Logger:         l,
 	}
 }

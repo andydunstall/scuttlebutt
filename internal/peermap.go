@@ -84,6 +84,18 @@ func (m *PeerMap) Addr(peerID string) (string, bool) {
 	return "", false
 }
 
+func (m *PeerMap) Version(peerID string) uint64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	peer, ok := m.peers[peerID]
+	if !ok {
+		// If we haven't see the peer the version is always 0.
+		return 0
+	}
+	return peer.Version()
+}
+
 func (m *PeerMap) PeersEqual(o *PeerMap) bool {
 	if len(m.peers) != len(o.peers) {
 		return false
@@ -110,42 +122,26 @@ func (m *PeerMap) UpdateLocal(key string, value string) {
 	m.peers[m.peerID].UpdateLocal(key, value)
 }
 
-// Digest all known peers and their versions. This is used to check for missing
-// entries when comparing with another nodes state.
-func (m *PeerMap) Digest() Digest {
+func (m *PeerMap) Digest(peerID string) Digest {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	digest := Digest{}
-	for peerID, peer := range m.peers {
-		digest[peerID] = peer.Digest()
+	peer, ok := m.peers[peerID]
+	if !ok {
+		return Digest{}
 	}
-	return digest
+	return peer.Digest()
 }
 
-// Deltas returns all peer entries whose version exceeds the corresponding peer
-// entry in the digest. A peer we know about that is not in the digest returns
-// all entries for that peer. The deltas are ordered by version per peer as they
-// may be truncated by the transport and we can't have gaps in versions.
-func (m *PeerMap) Deltas(digest Digest) Delta {
+func (m *PeerMap) Deltas(peerID string, version uint64) []Delta {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	delta := Delta{}
-	for peerID, peer := range m.peers {
-		entry, ok := digest[peerID]
-		// If we know about a peer that is not in the digest, use a version of
-		// 0 to send all entries.
-		if !ok {
-			entry.Version = 0
-		}
-
-		if peer.Version() > entry.Version {
-			delta[peerID] = peer.Deltas(entry.Version)
-		}
+	peer, ok := m.peers[peerID]
+	if !ok {
+		return []Delta{}
 	}
-
-	return delta
+	return peer.Deltas(version)
 }
 
 func (m *PeerMap) ApplyDigest(digest Digest) {
@@ -157,66 +153,52 @@ func (m *PeerMap) ApplyDigest(digest Digest) {
 		zap.Object("digest", digest),
 	)
 
-	for peerID, peerDigest := range digest {
-		peer, ok := m.peers[peerID]
-		if !ok {
-			m.logger.Info("node joined", zap.String("joined", peerID))
+	peer, ok := m.peers[digest.ID]
+	if !ok {
+		m.logger.Info("node joined", zap.String("joined", digest.ID))
 
-			if m.onJoin != nil {
-				m.mu.Unlock()
-				m.onJoin(peerID)
-				m.mu.Lock()
-			}
-
-			peer = NewPeer(peerID, peerDigest.Addr)
-			m.peers[peerID] = peer
+		if m.onJoin != nil {
+			m.mu.Unlock()
+			m.onJoin(digest.ID)
+			m.mu.Lock()
 		}
+
+		// Add the peer with a version of 0 given we don't have any state
+		// for the peer yet.
+		peer = NewPeer(digest.ID, digest.Addr)
+		m.peers[digest.ID] = peer
 	}
 }
 
-func (m *PeerMap) ApplyDeltas(delta Delta) {
+func (m *PeerMap) ApplyDelta(delta Delta) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if delta.ID == m.peerID {
+		m.logger.Error("received delta update about local peer")
+		return
+	}
+
+	peer, ok := m.peers[delta.ID]
+	if !ok {
+		// This should never happen. We only receive digest entries for
+		// the peers we requested.
+		return
+	}
+
 	m.logger.Debug(
 		"apply delta",
-		zap.Object("delta", delta),
+		zap.String("id", delta.ID),
+		zap.String("key", delta.Key),
+		zap.String("value", delta.Value),
+		zap.Uint64("version", delta.Version),
 	)
 
-	for peerID, peerDelta := range delta {
-		// Ignore updates about our own peer.
-		if peerID == m.peerID {
-			m.logger.Error("received delta update about local peer")
-			return
-		}
+	peer.UpdateRemote(delta.Key, delta.Value, delta.Version)
 
-		peer, ok := m.peers[peerID]
-		if !ok {
-			if m.onJoin != nil {
-				m.mu.Unlock()
-				m.onJoin(peerID)
-				m.mu.Lock()
-			}
-
-			peer = NewPeer(peerID, peerDelta.Addr)
-			m.peers[peerID] = peer
-		}
-
-		for _, entry := range peerDelta.Deltas {
-			m.logger.Debug(
-				"update remote",
-				zap.String("key", entry.Key),
-				zap.String("value", entry.Value),
-				zap.Uint64("version", entry.Version),
-			)
-
-			peer.UpdateRemote(entry.Key, entry.Value, entry.Version)
-
-			if m.onUpdate != nil {
-				m.mu.Unlock()
-				m.onUpdate(peerID, entry.Key, entry.Value)
-				m.mu.Lock()
-			}
-		}
+	if m.onUpdate != nil {
+		m.mu.Unlock()
+		m.onUpdate(delta.ID, delta.Key, delta.Value)
+		m.mu.Lock()
 	}
 }
