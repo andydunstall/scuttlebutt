@@ -143,8 +143,7 @@ func (g *Gossiper) sendDigestSync(addr string, request bool) error {
 		req = append(req, digestEnc...)
 	}
 
-	_, err := g.transport.WriteTo(req, addr)
-	if err != nil {
+	if err := g.transport.WriteTo(req, addr); err != nil {
 		g.logger.Error("failed to write to transport", zap.Error(err))
 		return fmt.Errorf("failed to write to transport %s: %v", addr, err)
 	}
@@ -174,8 +173,7 @@ func (g *Gossiper) sendDelta(sync []Digest, addr string) error {
 			zap.String("addr", addr),
 		)
 
-		_, err := g.transport.WriteTo(resp, addr)
-		if err != nil {
+		if err := g.transport.WriteTo(resp, addr); err != nil {
 			g.logger.Error("failed to write to transport", zap.Error(err))
 			return fmt.Errorf("failed to write to transport %s: %v", addr, err)
 		}

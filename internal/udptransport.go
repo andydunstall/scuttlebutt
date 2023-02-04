@@ -5,7 +5,6 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"go.uber.org/zap"
 )
@@ -46,18 +45,18 @@ func NewUDPTransport(bindAddr string, onPacket func(p *Packet), logger *zap.Logg
 	return t, nil
 }
 
-func (t *UDPTransport) WriteTo(b []byte, addr string) (time.Time, error) {
+func (t *UDPTransport) WriteTo(b []byte, addr string) error {
 	udpAddr, err := net.ResolveUDPAddr("udp", addr)
 	if err != nil {
-		return time.Time{}, err
+		return err
 	}
 
 	_, err = t.udpListener.WriteTo(b, udpAddr)
 	// If we've been shutdown ignore the error.
 	if s := atomic.LoadInt32(&t.shutdown); s == 1 {
-		return time.Now(), nil
+		return nil
 	}
-	return time.Now(), err
+	return err
 }
 
 func (t *UDPTransport) BindAddr() string {
@@ -85,7 +84,6 @@ func (t *UDPTransport) udpReadLoop(lis *net.UDPConn) {
 		// close as possible to the I/O.
 		buf := make([]byte, udpPacketBufSize)
 		n, addr, err := lis.ReadFrom(buf)
-		ts := time.Now()
 		if err != nil {
 			if s := atomic.LoadInt32(&t.shutdown); s == 1 {
 				break
@@ -103,9 +101,8 @@ func (t *UDPTransport) udpReadLoop(lis *net.UDPConn) {
 		}
 
 		t.onPacket(&Packet{
-			Buf:       buf[:n],
-			From:      addr,
-			Timestamp: ts,
+			Buf:  buf[:n],
+			From: addr,
 		})
 	}
 }

@@ -2,7 +2,6 @@ package internal
 
 import (
 	"net"
-	"time"
 )
 
 // Packet is used to provide some metadata about incoming packets from peers
@@ -14,20 +13,13 @@ type Packet struct {
 	// From has the address of the peer. This is an actual net.Addr so we
 	// can expose some concrete details about incoming packets.
 	From net.Addr
-
-	// Timestamp is the time when the packet was received. This should be
-	// taken as close as possible to the actual receipt time to help make an
-	// accurate RTT measurement during probes.
-	Timestamp time.Time
 }
 
 // Transport is an interface for a best-effort packet oriented transport.
 type Transport interface {
 	// WriteTo is a packet-oriented interface that fires off the given
-	// payload to the given address in a connectionless fashion. This should
-	// return a time stamp that's as close as possible to when the packet
-	// was transmitted to help make accurate RTT measurements during probes.
-	WriteTo(b []byte, addr string) (time.Time, error)
+	// payload to the given address in a connectionless fashion.
+	WriteTo(b []byte, addr string) error
 
 	// BindAddr returns the address the transport listener is bound to. Note
 	// this may be different from the configured bind addr if the system chooses
