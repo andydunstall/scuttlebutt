@@ -29,26 +29,16 @@ cluster. If `SeedCB` is given it will attempt to join the cluster by gossiping
 with these nodes. Note whenever the node doesn't know about any other peers it
 will re-seed by calling `SeedCB` to get a new list of seeds.
 
-The size of the node ID must not exceed 256 bytes.
-
 ```go
-node := scuttlebutt.Create(&scuttlebutt.Config{
-	ID: "773dc6df",
-	BindAddr: "0.0.0.0:8229",
-	SeedCB: func() []string {
+node := scuttlebutt.Create(
+	"0.0.0.0:8229",
+	scuttlebutt.WithSeedCB(func() []string {
 		return myconfig.Seeds
-	},
-	// Receive events about nodes joining, leaving and updating.
-	OnJoin: func(peerID string) {
-		fmt.Println("Node joined", peerID)
-	},
-	OnLeave: func(peerID string) {
-		fmt.Println("Node joined", peerID)
-	},
-	OnUpdate: func(peerID string, key string, value string) {
-		fmt.Println("Node updated", peerID, key, value)
-	}
-})
+	}),
+	scuttlebutt.WithOnJoin(...),
+	scuttlebutt.WithOnLeave(...),
+	scuttlebutt.WithOnUpdate(...),
+)
 ```
 
 ### Update our nodes state
@@ -69,7 +59,7 @@ Note typically you'll subscribe to updates with `OnUpdate` rather than querying
 directly.
 
 ```go
-addr, ok := node.Lookup("9a023689", "routing.addr")
+addr, ok := node.Lookup("10.26.104.82:7188", "routing.addr")
 if !ok {
 	// ...
 }

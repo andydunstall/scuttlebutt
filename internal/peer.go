@@ -11,8 +11,7 @@ type PeerEntry struct {
 
 // Peer represents the state of a peer.
 type Peer struct {
-	peerID string
-	addr   string
+	addr string
 	// version is the highest version of all the peers entries. This is used to
 	// compare versions between nodes to check for missing updates.
 	version uint64
@@ -20,19 +19,14 @@ type Peer struct {
 	entries map[string]PeerEntry
 }
 
-// NewPeer returns a new peer with the given ID, with a version of 0 to indicate
-// this hasn't had any updates.
-func NewPeer(peerID string, addr string) *Peer {
+// NewPeer returns a new peer with the given address, with a version of 0 to
+// indicate it has no known state.
+func NewPeer(addr string) *Peer {
 	return &Peer{
-		peerID:  peerID,
 		addr:    addr,
 		version: 0,
 		entries: make(map[string]PeerEntry),
 	}
-}
-
-func (p *Peer) ID() string {
-	return p.peerID
 }
 
 func (p *Peer) Addr() string {
@@ -51,9 +45,6 @@ func (p *Peer) Lookup(key string) (PeerEntry, bool) {
 }
 
 func (p *Peer) Equal(o *Peer) bool {
-	if p.peerID != o.peerID {
-		return false
-	}
 	if p.addr != o.addr {
 		return false
 	}
@@ -120,7 +111,6 @@ func (p *Peer) UpdateRemote(key string, value string, version uint64) {
 
 func (p *Peer) Digest() Digest {
 	return Digest{
-		ID:      p.peerID,
 		Addr:    p.addr,
 		Version: p.version,
 	}
@@ -139,7 +129,7 @@ func (p *Peer) Deltas(version uint64) []Delta {
 		}
 
 		deltas = append(deltas, Delta{
-			ID:      p.peerID,
+			Addr:    p.addr,
 			Key:     key,
 			Value:   entry.Value,
 			Version: entry.Version,

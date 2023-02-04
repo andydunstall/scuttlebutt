@@ -10,9 +10,9 @@ import (
 //
 // Note this is thread safe.
 type PeerMap struct {
-	// peerID is the ID of the local peer.
-	peerID string
-	// peers contains the set of known peers.
+	// localAddr is the address of the local node.
+	localAddr string
+	// peers contains the set of known peers indexed by address.
 	peers map[string]*Peer
 	// mu protects all above fields. Using a RWMutex since expect the workload to be
 	// quite read heavy (calculating deltas and digests).
@@ -22,73 +22,62 @@ type PeerMap struct {
 
 	// Note must not hold mu when invoking callback as it may call back to
 	// peerMap.
-	onJoin   func(peerID string)
-	onLeave  func(peerID string)
-	onUpdate func(peerID string, key string, value string)
+	onJoin   func(addr string)
+	onLeave  func(addr string)
+	onUpdate func(addr string, key string, value string)
 }
 
 func NewPeerMap(
-	peerID string,
-	peerAddr string,
-	onJoin func(peerID string),
-	onLeave func(peerID string),
-	onUpdate func(peerID string, key string, value string),
+	localAddr string,
+	onJoin func(addr string),
+	onLeave func(addr string),
+	onUpdate func(addr string, key string, value string),
 	logger *zap.Logger,
 ) *PeerMap {
 	peers := map[string]*Peer{
-		peerID: NewPeer(peerID, peerAddr),
+		localAddr: NewPeer(localAddr),
 	}
 	return &PeerMap{
-		peerID:   peerID,
-		peers:    peers,
-		mu:       sync.RWMutex{},
-		onJoin:   onJoin,
-		onLeave:  onLeave,
-		onUpdate: onUpdate,
-		logger:   logger,
+		localAddr: localAddr,
+		peers:     peers,
+		mu:        sync.RWMutex{},
+		onJoin:    onJoin,
+		onLeave:   onLeave,
+		onUpdate:  onUpdate,
+		logger:    logger,
 	}
 }
 
-// PeerIDs returns the IDs of the peers known by this node. If includeLocal
+// Addrs returns the addresses of the peers known by this node. If includeLocal
 // is true the local node is included, otherwise it isn't.
-func (m *PeerMap) PeerIDs(includeLocal bool) []string {
+func (m *PeerMap) Addrs(includeLocal bool) []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	peers := make([]string, 0, len(m.peers))
-	for peerID, _ := range m.peers {
-		if includeLocal || peerID != m.peerID {
-			peers = append(peers, peerID)
+	for addr, _ := range m.peers {
+		if includeLocal || addr != m.localAddr {
+			peers = append(peers, addr)
 		}
 	}
 	return peers
 }
 
-func (m *PeerMap) Lookup(peerID string, key string) (PeerEntry, bool) {
+func (m *PeerMap) Lookup(addr string, key string) (PeerEntry, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if peer, ok := m.peers[peerID]; ok {
+	if peer, ok := m.peers[addr]; ok {
 		return peer.Lookup(key)
 	}
 	return PeerEntry{}, false
 }
 
-func (m *PeerMap) Addr(peerID string) (string, bool) {
+func (m *PeerMap) Version(addr string) uint64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if peer, ok := m.peers[peerID]; ok {
-		return peer.Addr(), true
-	}
-	return "", false
-}
-
-func (m *PeerMap) Version(peerID string) uint64 {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	peer, ok := m.peers[peerID]
+	peer, ok := m.peers[addr]
 	if !ok {
 		// If we haven't see the peer the version is always 0.
 		return 0
@@ -119,25 +108,25 @@ func (m *PeerMap) UpdateLocal(key string, value string) {
 
 	m.logger.Debug("update local", zap.String("key", key), zap.String("value", value))
 
-	m.peers[m.peerID].UpdateLocal(key, value)
+	m.peers[m.localAddr].UpdateLocal(key, value)
 }
 
-func (m *PeerMap) Digest(peerID string) Digest {
+func (m *PeerMap) Digest(addr string) Digest {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	peer, ok := m.peers[peerID]
+	peer, ok := m.peers[addr]
 	if !ok {
 		return Digest{}
 	}
 	return peer.Digest()
 }
 
-func (m *PeerMap) Deltas(peerID string, version uint64) []Delta {
+func (m *PeerMap) Deltas(addr string, version uint64) []Delta {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	peer, ok := m.peers[peerID]
+	peer, ok := m.peers[addr]
 	if !ok {
 		return []Delta{}
 	}
@@ -153,20 +142,20 @@ func (m *PeerMap) ApplyDigest(digest Digest) {
 		zap.Object("digest", digest),
 	)
 
-	peer, ok := m.peers[digest.ID]
+	peer, ok := m.peers[digest.Addr]
 	if !ok {
-		m.logger.Info("node joined", zap.String("joined", digest.ID))
+		m.logger.Info("node joined", zap.String("joined", digest.Addr))
 
 		if m.onJoin != nil {
 			m.mu.Unlock()
-			m.onJoin(digest.ID)
+			m.onJoin(digest.Addr)
 			m.mu.Lock()
 		}
 
 		// Add the peer with a version of 0 given we don't have any state
 		// for the peer yet.
-		peer = NewPeer(digest.ID, digest.Addr)
-		m.peers[digest.ID] = peer
+		peer = NewPeer(digest.Addr)
+		m.peers[digest.Addr] = peer
 	}
 }
 
@@ -174,12 +163,12 @@ func (m *PeerMap) ApplyDelta(delta Delta) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if delta.ID == m.peerID {
+	if delta.Addr == m.localAddr {
 		m.logger.Error("received delta update about local peer")
 		return
 	}
 
-	peer, ok := m.peers[delta.ID]
+	peer, ok := m.peers[delta.Addr]
 	if !ok {
 		// This should never happen. We only receive digest entries for
 		// the peers we requested.
@@ -188,7 +177,7 @@ func (m *PeerMap) ApplyDelta(delta Delta) {
 
 	m.logger.Debug(
 		"apply delta",
-		zap.String("id", delta.ID),
+		zap.String("addr", delta.Addr),
 		zap.String("key", delta.Key),
 		zap.String("value", delta.Value),
 		zap.Uint64("version", delta.Version),
@@ -198,7 +187,7 @@ func (m *PeerMap) ApplyDelta(delta Delta) {
 
 	if m.onUpdate != nil {
 		m.mu.Unlock()
-		m.onUpdate(delta.ID, delta.Key, delta.Value)
+		m.onUpdate(delta.Addr, delta.Key, delta.Value)
 		m.mu.Lock()
 	}
 }

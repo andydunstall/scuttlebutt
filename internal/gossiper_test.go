@@ -74,27 +74,25 @@ func TestGossiper_SyncState(t *testing.T) {
 }
 
 func randomPeerMap(numPeers int, numValues int) *PeerMap {
-	localPeerID := fmt.Sprintf("peer-%d", rand.Int())
-	peerMap := NewPeerMap(localPeerID, randomAddr(), nil, nil, nil, zap.NewNop())
+	peerMap := NewPeerMap(randomAddr(), nil, nil, nil, zap.NewNop())
 	for j := 0; j != numValues; j++ {
 		peerMap.UpdateLocal(
-			fmt.Sprintf("%s-key-%d", localPeerID, rand.Int()),
-			fmt.Sprintf("%s-value-%d", localPeerID, rand.Int()),
+			fmt.Sprintf("key-%d", rand.Int()),
+			fmt.Sprintf("value-%d", rand.Int()),
 		)
 	}
 
 	for i := 1; i != numValues+1; i++ {
-		peerID := fmt.Sprintf("peer-%d", rand.Int())
+		addr := randomAddr()
 		peerMap.ApplyDigest(Digest{
-			ID:      peerID,
-			Addr:    "10.26.104.56:9110",
+			Addr:    addr,
 			Version: 0,
 		})
 		for j := 0; j != numPeers; j++ {
 			peerMap.ApplyDelta(Delta{
-				ID:      peerID,
-				Key:     fmt.Sprintf("%s-key-%d", peerID, rand.Int()),
-				Value:   fmt.Sprintf("%s-value-%d", peerID, rand.Int()),
+				Addr:    addr,
+				Key:     fmt.Sprintf("key-%d", rand.Int()),
+				Value:   fmt.Sprintf("value-%d", rand.Int()),
 				Version: uint64(randomUint16()),
 			})
 		}

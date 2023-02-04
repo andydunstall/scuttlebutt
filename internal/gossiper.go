@@ -9,9 +9,9 @@ import (
 )
 
 type peerVersionDelta struct {
-	PeerID  string
-	Delta   uint64
-	Version uint64
+	PeerAddr string
+	Delta    uint64
+	Version  uint64
 }
 
 type Gossiper struct {
@@ -30,12 +30,12 @@ func NewGossiper(peerMap *PeerMap, transport Transport, maxMessageSize int, logg
 	}
 }
 
-func (g *Gossiper) PeerIDs(includeLocal bool) []string {
-	return g.peerMap.PeerIDs(includeLocal)
+func (g *Gossiper) Addrs(includeLocal bool) []string {
+	return g.peerMap.Addrs(includeLocal)
 }
 
-func (g *Gossiper) Lookup(peerID string, key string) (string, bool) {
-	e, ok := g.peerMap.Lookup(peerID, key)
+func (g *Gossiper) Lookup(addr string, key string) (string, bool) {
+	e, ok := g.peerMap.Lookup(addr, key)
 	if !ok {
 		return "", false
 	}
@@ -100,16 +100,14 @@ func (g *Gossiper) Seed(seeds []string) {
 	}
 }
 
-func (g *Gossiper) RandomPeer() (string, string, bool) {
-	if len(g.peerMap.PeerIDs(false)) == 0 {
-		return "", "", false
+func (g *Gossiper) RandomPeer() (string, bool) {
+	if len(g.peerMap.Addrs(false)) == 0 {
+		return "", false
 	}
 
 	// Scuttlebutt with a random peer (excluding ourselves).
-	peerIDs := g.peerMap.PeerIDs(false)
-	peerID := peerIDs[rand.Intn(len(peerIDs))]
-	addr, ok := g.peerMap.Addr(peerID)
-	return peerID, addr, ok
+	addrs := g.peerMap.Addrs(false)
+	return addrs[rand.Intn(len(addrs))], true
 }
 
 func (g *Gossiper) Close() error {
@@ -126,8 +124,8 @@ func (g *Gossiper) sendDigestResponse(addr string) error {
 }
 
 func (g *Gossiper) sendDigestSync(addr string, request bool) error {
-	peerIDs := g.peerMap.PeerIDs(true)
-	shuffle(peerIDs)
+	peerAddrs := g.peerMap.Addrs(true)
+	shuffle(peerAddrs)
 
 	messageType := typeDigestRequest
 	if !request {
@@ -135,8 +133,8 @@ func (g *Gossiper) sendDigestSync(addr string, request bool) error {
 	}
 
 	req := []byte{byte(messageType)}
-	for _, peerID := range peerIDs {
-		digest := g.peerMap.Digest(peerID)
+	for _, addr := range peerAddrs {
+		digest := g.peerMap.Digest(addr)
 		digestEnc := encodeDigest(digest)
 		if len(req)+len(digestEnc) > g.maxMessageSize {
 			break
@@ -158,7 +156,7 @@ func (g *Gossiper) sendDelta(sync []Digest, addr string) error {
 	resp := []byte{byte(typeDelta)}
 	peerVersionDeltas := g.peerVersionDeltas(sync)
 	for _, entry := range peerVersionDeltas {
-		deltas := g.peerMap.Deltas(entry.PeerID, entry.Version)
+		deltas := g.peerMap.Deltas(entry.PeerAddr, entry.Version)
 		for _, delta := range deltas {
 			deltaEnc := encodeDelta(delta)
 			if len(sync)+len(deltaEnc) > g.maxMessageSize {
@@ -224,12 +222,12 @@ func (g *Gossiper) onDelta(sync []Delta, fromAddr string) error {
 func (g *Gossiper) peerVersionDeltas(sync []Digest) []peerVersionDelta {
 	peerVersionDeltas := []peerVersionDelta{}
 	for _, digest := range sync {
-		knownVersion := g.peerMap.Version(digest.ID)
+		knownVersion := g.peerMap.Version(digest.Addr)
 		if digest.Version < knownVersion {
 			peerVersionDeltas = append(peerVersionDeltas, peerVersionDelta{
-				PeerID:  digest.ID,
-				Delta:   knownVersion - digest.Version,
-				Version: digest.Version,
+				PeerAddr: digest.Addr,
+				Delta:    knownVersion - digest.Version,
+				Version:  digest.Version,
 			})
 		}
 	}

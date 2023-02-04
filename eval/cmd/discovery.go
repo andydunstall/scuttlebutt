@@ -33,7 +33,7 @@ var discoveryCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("failed to add node: %v", err)
 		}
-		if err = cluster.WaitToDiscover(ctx, node.ID); err != nil {
+		if err = cluster.WaitToDiscover(ctx, node.Gossiper.BindAddr()); err != nil {
 			log.Fatalf("timed out waiting for cluster to discover node: %v", err)
 		}
 	},
