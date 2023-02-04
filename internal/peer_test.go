@@ -8,7 +8,7 @@ import (
 )
 
 func TestPeer_UpdateLocalThenLookup(t *testing.T) {
-	p := NewPeer("", "")
+	p := NewPeer("")
 
 	p.UpdateLocal("foo", "bar")
 
@@ -18,7 +18,7 @@ func TestPeer_UpdateLocalThenLookup(t *testing.T) {
 }
 
 func TestPeer_LookupNotFound(t *testing.T) {
-	p := NewPeer("", "")
+	p := NewPeer("")
 	p.UpdateLocal("foo", "bar")
 
 	_, ok := p.Lookup("car")
@@ -26,7 +26,7 @@ func TestPeer_LookupNotFound(t *testing.T) {
 }
 
 func TestPeer_UpdateLocalIncrementsVersion(t *testing.T) {
-	p := NewPeer("", "")
+	p := NewPeer("")
 
 	// Peer version should start at 0.
 	assert.Equal(t, uint64(0), p.Version())
@@ -40,7 +40,7 @@ func TestPeer_UpdateLocalIncrementsVersion(t *testing.T) {
 
 // Tests local updates don't increase the version when the value is unchanged.
 func TestPeer_UpdateLocalDiscardsDuplicateUpdate(t *testing.T) {
-	p := NewPeer("", "")
+	p := NewPeer("")
 
 	// Peer version should start at 0.
 	assert.Equal(t, uint64(0), p.Version())
@@ -55,7 +55,7 @@ func TestPeer_UpdateLocalDiscardsDuplicateUpdate(t *testing.T) {
 }
 
 func TestPeer_UpdateRemoteUpdatesValue(t *testing.T) {
-	p := NewPeer("", "")
+	p := NewPeer("")
 
 	p.UpdateRemote("foo", "bar", 10)
 	e, ok := p.Lookup("foo")
@@ -69,7 +69,7 @@ func TestPeer_UpdateRemoteUpdatesValue(t *testing.T) {
 }
 
 func TestPeer_UpdateRemoteUpdatesPeerVersion(t *testing.T) {
-	p := NewPeer("", "")
+	p := NewPeer("")
 
 	p.UpdateRemote("foo", "bar", 10)
 	assert.Equal(t, uint64(10), p.Version())
@@ -84,7 +84,7 @@ func TestPeer_UpdateRemoteUpdatesPeerVersion(t *testing.T) {
 }
 
 func TestPeer_UpdateRemoteDiscardsOldVersion(t *testing.T) {
-	p := NewPeer("", "")
+	p := NewPeer("")
 
 	// Update and check value updated.
 	p.UpdateRemote("foo", "bar", 10)
@@ -100,9 +100,8 @@ func TestPeer_UpdateRemoteDiscardsOldVersion(t *testing.T) {
 }
 
 func TestPeer_Digest(t *testing.T) {
-	p := NewPeer("my-peer", "10.26.104.52:8119")
+	p := NewPeer("10.26.104.52:8119")
 	assert.Equal(t, Digest{
-		ID:      "my-peer",
 		Addr:    "10.26.104.52:8119",
 		Version: 0,
 	}, p.Digest())
@@ -110,7 +109,7 @@ func TestPeer_Digest(t *testing.T) {
 
 // Tests deltas returns all entries with a greater version in sorted order.
 func TestPeer_Deltas(t *testing.T) {
-	p := NewPeer("my-peer", "10.26.104.52:8119")
+	p := NewPeer("10.26.104.52:8119")
 
 	p.UpdateLocal("a", "b")
 	p.UpdateRemote("c", "d", 3)
@@ -119,17 +118,17 @@ func TestPeer_Deltas(t *testing.T) {
 
 	// Expect a version of 0 to include all entries.
 	expectedSince0 := []Delta{
-		{ID: "my-peer", Key: "a", Value: "b", Version: 1},
-		{ID: "my-peer", Key: "c", Value: "d", Version: 3},
-		{ID: "my-peer", Key: "e", Value: "f", Version: 7},
-		{ID: "my-peer", Key: "g", Value: "h", Version: 9},
+		{Addr: "10.26.104.52:8119", Key: "a", Value: "b", Version: 1},
+		{Addr: "10.26.104.52:8119", Key: "c", Value: "d", Version: 3},
+		{Addr: "10.26.104.52:8119", Key: "e", Value: "f", Version: 7},
+		{Addr: "10.26.104.52:8119", Key: "g", Value: "h", Version: 9},
 	}
 	assert.Equal(t, expectedSince0, p.Deltas(0))
 
 	// A version of 3 should only returns entries with greater versions.
 	expectedSince3 := []Delta{
-		{ID: "my-peer", Key: "e", Value: "f", Version: 7},
-		{ID: "my-peer", Key: "g", Value: "h", Version: 9},
+		{Addr: "10.26.104.52:8119", Key: "e", Value: "f", Version: 7},
+		{Addr: "10.26.104.52:8119", Key: "g", Value: "h", Version: 9},
 	}
 	assert.Equal(t, expectedSince3, p.Deltas(3))
 

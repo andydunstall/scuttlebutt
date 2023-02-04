@@ -8,9 +8,9 @@ import (
 )
 
 type peerUpdate struct {
-	PeerID string
-	Key    string
-	Value  string
+	Addr  string
+	Key   string
+	Value string
 }
 
 type NodeSubscriber struct {
@@ -27,17 +27,17 @@ func NewNodeSubscriber() *NodeSubscriber {
 	}
 }
 
-func (e *NodeSubscriber) OnJoin(peerID string) {
-	e.PeerJoinedCh <- peerID
+func (e *NodeSubscriber) OnJoin(addr string) {
+	e.PeerJoinedCh <- addr
 }
 
-func (e *NodeSubscriber) OnLeave(peerID string) {}
+func (e *NodeSubscriber) OnLeave(addr string) {}
 
-func (e *NodeSubscriber) OnUpdate(peerID string, key string, value string) {
+func (e *NodeSubscriber) OnUpdate(addr string, key string, value string) {
 	e.PeerUpdatedCh <- peerUpdate{
-		PeerID: peerID,
-		Key:    key,
-		Value:  value,
+		Addr:  addr,
+		Key:   key,
+		Value: value,
 	}
 }
 
@@ -52,8 +52,8 @@ func (s *NodeSubscriber) WaitPeerUpdatedWithTimeout(t time.Duration) (peerUpdate
 
 func (s *NodeSubscriber) WaitPeerJoinedWithTimeout(t time.Duration) (string, bool) {
 	select {
-	case peerID := <-s.PeerJoinedCh:
-		return peerID, true
+	case addr := <-s.PeerJoinedCh:
+		return addr, true
 	case <-time.After(t):
 		return "", false
 	}
@@ -69,7 +69,7 @@ func NewCluster() *Cluster {
 	}
 }
 
-func (c *Cluster) AddNode(peerID string, nodeSub *NodeSubscriber) (*scuttlebutt.Scuttlebutt, error) {
+func (c *Cluster) AddNode(nodeSub *NodeSubscriber) (*scuttlebutt.Scuttlebutt, error) {
 	opts := []scuttlebutt.Option{
 		scuttlebutt.WithSeedCB(func() []string {
 			return c.Seeds()
@@ -82,11 +82,11 @@ func (c *Cluster) AddNode(peerID string, nodeSub *NodeSubscriber) (*scuttlebutt.
 		opts = append(opts, scuttlebutt.WithOnUpdate(nodeSub.OnUpdate))
 	}
 
-	node, err := scuttlebutt.Create(peerID, "127.0.0.1:0", opts...)
+	node, err := scuttlebutt.Create("127.0.0.1:0", opts...)
 	if err != nil {
 		return nil, err
 	}
-	c.nodes[peerID] = node
+	c.nodes[node.BindAddr()] = node
 	return node, nil
 }
 

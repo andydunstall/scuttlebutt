@@ -6,36 +6,33 @@ import (
 	"time"
 
 	"github.com/andydunstall/scuttlebutt"
-	"github.com/google/uuid"
 	multierror "github.com/hashicorp/go-multierror"
 	"go.uber.org/zap"
 )
 
 type Node struct {
-	ID       string
 	Gossiper *scuttlebutt.Scuttlebutt
 }
 
 func (n *Node) KnownPeers() int {
-	// Add one to include itself.
-	return len(n.Gossiper.PeerIDs())
+	return len(n.Gossiper.Addrs())
 }
 
-func (n *Node) DiscoveredNode(nodeID string) bool {
-	if nodeID == n.ID {
+func (n *Node) DiscoveredNode(nodeAddr string) bool {
+	if nodeAddr == n.Gossiper.BindAddr() {
 		return true
 	}
 
-	for _, id := range n.Gossiper.PeerIDs() {
-		if nodeID == id {
+	for _, addr := range n.Gossiper.Addrs() {
+		if nodeAddr == addr {
 			return true
 		}
 	}
 	return false
 }
 
-func (n *Node) ReceivedUpdate(nodeID string, key string, value string) bool {
-	val, ok := n.Gossiper.Lookup(nodeID, key)
+func (n *Node) ReceivedUpdate(nodeAddr string, key string, value string) bool {
+	val, ok := n.Gossiper.Lookup(nodeAddr, key)
 	if ok && val == value {
 		return true
 	}
@@ -54,12 +51,9 @@ func NewCluster() *Cluster {
 }
 
 func (c *Cluster) AddNode() (*Node, error) {
-	id := uuid.New().String()[:7]
 	logger, _ := zap.NewDevelopment()
-	logger = logger.With(zap.String("peer-id", id))
 
 	gossiper, err := scuttlebutt.Create(
-		id,
 		"127.0.0.1:0",
 		scuttlebutt.WithSeedCB(func() []string {
 			return c.seeds(3)
@@ -71,10 +65,9 @@ func (c *Cluster) AddNode() (*Node, error) {
 		return nil, err
 	}
 	node := &Node{
-		ID:       id,
 		Gossiper: gossiper,
 	}
-	c.nodes[node.ID] = node
+	c.nodes[gossiper.BindAddr()] = node
 	return node, nil
 }
 
@@ -113,8 +106,8 @@ func (c *Cluster) WaitForHealthy(ctx context.Context) error {
 }
 
 // WaitToDiscover waits for all nodes to be notified about the node with the
-// given ID joining the cluster.
-func (c *Cluster) WaitToDiscover(ctx context.Context, nodeID string) error {
+// given addr joining the cluster.
+func (c *Cluster) WaitToDiscover(ctx context.Context, nodeAddr string) error {
 	// TODO(AD) for now just poll - later subscribe to each gossip - and
 	// add another subscriber to fire once discovered the given node
 	ticker := time.NewTicker(10 * time.Millisecond)
@@ -126,7 +119,7 @@ func (c *Cluster) WaitToDiscover(ctx context.Context, nodeID string) error {
 		case <-ticker.C:
 			healthyNodes := 0
 			for _, node := range c.nodes {
-				if node.DiscoveredNode(nodeID) {
+				if node.DiscoveredNode(nodeAddr) {
 					healthyNodes += 1
 				}
 			}
@@ -139,7 +132,7 @@ func (c *Cluster) WaitToDiscover(ctx context.Context, nodeID string) error {
 }
 
 // WaitToUpdate waits for all nodes to be notified about the given update.
-func (c *Cluster) WaitToUpdate(ctx context.Context, nodeID string, key string, value string) error {
+func (c *Cluster) WaitToUpdate(ctx context.Context, nodeAddr string, key string, value string) error {
 	// TODO(AD) for now just poll - later subscribe to each gossip - and
 	// add another subscriber to fire once discovered the given node
 	ticker := time.NewTicker(10 * time.Millisecond)
@@ -151,7 +144,7 @@ func (c *Cluster) WaitToUpdate(ctx context.Context, nodeID string, key string, v
 		case <-ticker.C:
 			healthyNodes := 0
 			for _, node := range c.nodes {
-				if node.ReceivedUpdate(nodeID, key, value) {
+				if node.ReceivedUpdate(nodeAddr, key, value) {
 					healthyNodes += 1
 				}
 			}

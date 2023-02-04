@@ -19,13 +19,13 @@ type Options struct {
 	SeedCB func() []string
 
 	// OnJoin is invoked when a peer joins the cluster.
-	OnJoin func(peerID string)
+	OnJoin func(peerAddr string)
 
 	// OnLeave is invoked when a peer joins the cluster.
-	OnLeave func(peerID string)
+	OnLeave func(peerAddr string)
 
 	// OnUpdate is invoked when a peers state is updated.
-	OnUpdate func(peerID string, key string, value string)
+	OnUpdate func(peerAddr string, key string, value string)
 
 	// MaxMessageSize is the maximum allowed UDP payload for gossip messages.
 	// If the MTU is known this should be increased to the maximum size. If not
@@ -48,19 +48,19 @@ func WithSeedCB(seedCB func() []string) Option {
 	}
 }
 
-func WithOnJoin(cb func(peerID string)) Option {
+func WithOnJoin(cb func(peerAddr string)) Option {
 	return func(opts *Options) {
 		opts.OnJoin = cb
 	}
 }
 
-func WithOnLeave(cb func(peerID string)) Option {
+func WithOnLeave(cb func(peerAddr string)) Option {
 	return func(opts *Options) {
 		opts.OnLeave = cb
 	}
 }
 
-func WithOnUpdate(cb func(peerID string, key string, value string)) Option {
+func WithOnUpdate(cb func(peerAddr string, key string, value string)) Option {
 	return func(opts *Options) {
 		opts.OnUpdate = cb
 	}

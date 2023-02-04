@@ -1,7 +1,6 @@
 package scuttlebutt
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -26,13 +25,13 @@ type Scuttlebutt struct {
 // will not attempt to join the cluster itself unless contacted by another
 // node.
 // After this the given configuration should not be modified again.
-func Create(id string, addr string, options ...Option) (*Scuttlebutt, error) {
+func Create(addr string, options ...Option) (*Scuttlebutt, error) {
 	opts := defaultOptions()
 	for _, opt := range options {
 		opt(opts)
 	}
 
-	g, err := newScuttlebutt(id, addr, opts)
+	g, err := newScuttlebutt(addr, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -40,18 +39,18 @@ func Create(id string, addr string, options ...Option) (*Scuttlebutt, error) {
 	return g, nil
 }
 
-// Peers returns the IDs of the peers known by this node (including
+// Addrs returns the addresses of the peers known by this node (including
 // ourselves).
-func (s *Scuttlebutt) PeerIDs() []string {
-	return s.gossiper.PeerIDs(true)
+func (s *Scuttlebutt) Addrs() []string {
+	return s.gossiper.Addrs(true)
 }
 
-// Lookup looks up the given key in the known state of the peer with the given
-// ID. Since the cluster state is eventually consistent, this isn't guaranteed
-// to be up to date with the actual state of the peer, though should converge
-// quickly.
-func (s *Scuttlebutt) Lookup(peerID string, key string) (string, bool) {
-	return s.gossiper.Lookup(peerID, key)
+// Lookup looks up the given key in the known state of the peer with the
+// address. Since the cluster state is eventually consistent, this isn't
+// guaranteed to be up to date with the actual state of the peer, though should
+// converge quickly.
+func (s *Scuttlebutt) Lookup(addr string, key string) (string, bool) {
+	return s.gossiper.Lookup(addr, key)
 }
 
 // UpdateLocal updates this nodes state with the given key-value pair. This will
@@ -79,13 +78,7 @@ func (s *Scuttlebutt) Shutdown() error {
 	return err
 }
 
-func newScuttlebutt(id string, addr string, opts *Options) (*Scuttlebutt, error) {
-	// Limit the size of the node ID size this is encoded with a 1 byte size
-	// prefix.
-	if len(id) > internal.MaxNodeIDSize {
-		return nil, fmt.Errorf("node id too large (cannot exceed 256 bytes)")
-	}
-
+func newScuttlebutt(addr string, opts *Options) (*Scuttlebutt, error) {
 	gossip := &Scuttlebutt{
 		seedCB:         opts.SeedCB,
 		gossipInterval: opts.Interval,
@@ -104,7 +97,6 @@ func newScuttlebutt(id string, addr string, opts *Options) (*Scuttlebutt, error)
 	opts.Logger.Debug("transport started", zap.String("addr", transport.BindAddr()))
 
 	peerMap := internal.NewPeerMap(
-		id,
 		// Note use transport bind addr not configured bind addr as these
 		// may be different if the system assigns the port.
 		transport.BindAddr(),
@@ -142,7 +134,7 @@ func (s *Scuttlebutt) gossipLoop() {
 }
 
 func (s *Scuttlebutt) round() {
-	_, addr, ok := s.gossiper.RandomPeer()
+	addr, ok := s.gossiper.RandomPeer()
 	if !ok {
 		// If we don't know about any other peers in the cluster re-seed.
 		s.seed()

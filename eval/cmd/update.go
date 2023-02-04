@@ -35,7 +35,7 @@ var updateCmd = &cobra.Command{
 		}
 		node.Gossiper.UpdateLocal("foo", "bar")
 
-		if err = cluster.WaitToUpdate(ctx, node.ID, "foo", "bar"); err != nil {
+		if err = cluster.WaitToUpdate(ctx, node.Gossiper.BindAddr(), "foo", "bar"); err != nil {
 			log.Fatalf("timed out waiting for update to propagate: %v", err)
 		}
 	},

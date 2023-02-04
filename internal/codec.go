@@ -7,8 +7,6 @@ import (
 type messageType uint8
 
 const (
-	MaxNodeIDSize = 0xff
-
 	typeDigestRequest  messageType = 1
 	typeDigestResponse messageType = 2
 	typeDelta          messageType = 3
@@ -52,21 +50,20 @@ func encodeString(buf []byte, offset int, s string) int {
 }
 
 func encodeDigest(d Digest) []byte {
-	payloadLen := uint8Len + len(d.ID) + uint8Len + len(d.Addr) + uint64Len
+	payloadLen := uint8Len + len(d.Addr) + uint64Len
 
 	b := make([]byte, payloadLen)
-	offset := encodeString(b, 0, d.ID)
-	offset = encodeString(b, offset, d.Addr)
+	offset := encodeString(b, 0, d.Addr)
 	encodeUint64(b, offset, d.Version)
 
 	return b
 }
 
 func encodeDelta(d Delta) []byte {
-	payloadLen := uint8Len + len(d.ID) + uint8Len + len(d.Key) + uint8Len + len(d.Value) + uint64Len
+	payloadLen := uint8Len + len(d.Addr) + uint8Len + len(d.Key) + uint8Len + len(d.Value) + uint64Len
 
 	b := make([]byte, payloadLen)
-	offset := encodeString(b, 0, d.ID)
+	offset := encodeString(b, 0, d.Addr)
 	offset = encodeString(b, offset, d.Key)
 	offset = encodeString(b, offset, d.Value)
 	encodeUint64(b, offset, d.Version)
@@ -101,11 +98,9 @@ func decodeString(buf []byte, offset int) (string, int) {
 }
 
 func decodeDigest(b []byte, offset int) (Digest, int) {
-	id, offset := decodeString(b, offset)
 	addr, offset := decodeString(b, offset)
 	version, offset := decodeUint64(b, offset)
 	return Digest{
-		ID:      id,
 		Addr:    addr,
 		Version: version,
 	}, offset
@@ -123,12 +118,12 @@ func decodeDigestSync(b []byte) []Digest {
 }
 
 func decodeDelta(b []byte, offset int) (Delta, int) {
-	id, offset := decodeString(b, offset)
+	addr, offset := decodeString(b, offset)
 	key, offset := decodeString(b, offset)
 	value, offset := decodeString(b, offset)
 	version, offset := decodeUint64(b, offset)
 	return Delta{
-		ID:      id,
+		Addr:    addr,
 		Key:     key,
 		Value:   value,
 		Version: version,

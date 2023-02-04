@@ -7,8 +7,7 @@ Each node contains an in-memory store containing its known state about the
 all peers in the cluster (including itself).
 
 This state contains:
-* The peers ID,
-* The address that peer listens on,
+* The peer address,
 * A set of versioned key-value pairs (containing the application state),
 * The peers version as known by this node, which is the maximum version of
 the peers key-value pairs.
@@ -16,7 +15,6 @@ the peers key-value pairs.
 Such as an entry for a known peer may have state:
 ```
 {
-	"id": "peer_9873",
 	"addr": "10.26.104.64:8119",
 	"version": 14,
 	"state": {
@@ -42,7 +40,6 @@ up to date.
 So the entry becomes:
 ```
 {
-	"id": "peer_9873",
 	"addr": "10.26.104.64:8119",
 	"version": 15,
 	"state": {
@@ -110,7 +107,6 @@ digest request.
 
 Node A fetches a shuffled list of peers from its known state and iterates. For
 each peer it adds to the digest the:
-* Peer ID,
 * Peer address,
 * Peer version.
 Note this does not include the key-value state for that peer.
@@ -132,7 +128,7 @@ is full.
 This means we start by iterating though each entry in the digest and comparing
 the digests known version of a peer and our known version of that peer. If
 our version is greater than the digest version we know we have some state that
-the sender doesn't, so build a list of peer IDs that the sender is missing state
+the sender doesn't, so build a list of peer address that the sender is missing state
 on, sorted by the difference in versions. This means the first peer in the list
 is the peer the sender is missing the most state on.
 
@@ -179,12 +175,11 @@ Each message is prefixed with a 1 byte (`uint8`) type:
 
 Since only UDP is supported no framing information is needed.
 
-Variable size strings (such as the peer ID and peer address) are prefixed with
-their `uint8` size (meaning peer IDs are limited to 256 bytes).
+Variable size strings (such as the peer address) are prefixed with
+their `uint8` size.
 
 ### `DIGEST-REQUEST`
 Contains a list of entries appended together, each containing:
-* Peer ID: Encoded string,
 * Peer address: Encoded string (note we encode as a string rather than integer
 format as support custom transports where the address format is unknown),
 * Peer version: `uint64`
@@ -195,7 +190,7 @@ indicate the receiver should not respond with its own digest.
 
 ### `DELTA`
 Contains a list of entries appended together, each containing:
-* Peer ID: Encoded string,
+* Peer address: Encoded string,
 * Key: Encoded string,
 * Value: Encoded string,
 * Version: `uint64`
