@@ -164,8 +164,6 @@ func (s *Scuttlebutt) gossipToUpPeer() {
 func (s *Scuttlebutt) gossipToDownPeer() {
 	addr, ok := s.gossiper.RandomDownPeer()
 	if !ok {
-		// If we don't know about any other peers in the cluster re-seed.
-		s.seed()
 		return
 	}
 	s.gossiper.SendDigestRequest(addr)

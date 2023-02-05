@@ -15,6 +15,8 @@ cluster. This state is presented as a key-value store on each node, but
 typically, applications subscribe to updates about node join/leave and state
 changes.
 
+Failed nodes in the cluster are detected using the phi accrual failure detector.
+
 The implementation is described in [docs/](docs/).
 
 ## Usage
@@ -23,8 +25,10 @@ The full API docs can be viewed with `go doc --all`.
 ### Create a gossip node
 Creates a new node, which will start listening for updates from nodes in the
 cluster. If `SeedCB` is given it will attempt to join the cluster by gossiping
-with these nodes. Note whenever the node doesn't know about any other peers it
-will re-seed by calling `SeedCB` to get a new list of seeds.
+with these nodes.
+
+Whenever the node doesn't know about any other peers it will re-seed by calling
+`SeedCB` to get a new list of seeds.
 
 ```go
 node := scuttlebutt.Create(
@@ -38,6 +42,8 @@ node := scuttlebutt.Create(
 )
 ```
 
+See [`options.go`](options.go) for the full set of options.
+
 ### Update our nodes state
 Updates our nodes local state, which will be propagated to other nodes in the
 cluster and notify their subscribes of the update.
@@ -46,6 +52,8 @@ cluster and notify their subscribes of the update.
 node.UpdateLocal("routing.addr", "10.25.104.42:5112")
 node.UpdateLocal("state", "ready")
 ```
+
+Note the keys and values are limitted to 256 bytes.
 
 ### Lookup the known state of another node
 Looks up the state of the peer as known by this node. Since the cluster
