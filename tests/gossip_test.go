@@ -50,3 +50,29 @@ func TestGossip_PeerDiscovery(t *testing.T) {
 	_, ok = sub.WaitPeerJoinedWithTimeout(time.Second)
 	assert.True(t, ok)
 }
+
+func TestGossip_DetectFailedNode(t *testing.T) {
+	cluster := NewCluster()
+	defer cluster.Shutdown()
+
+	sub := NewNodeSubscriber()
+
+	_, err := cluster.AddNode(sub)
+	assert.Nil(t, err)
+	_, err = cluster.AddNode(nil)
+	assert.Nil(t, err)
+	node3, err := cluster.AddNode(nil)
+	assert.Nil(t, err)
+
+	// Wait to discovery the other nodes.
+	_, ok := sub.WaitPeerJoinedWithTimeout(time.Second)
+	assert.True(t, ok)
+	_, ok = sub.WaitPeerJoinedWithTimeout(time.Second)
+	assert.True(t, ok)
+
+	node3.Shutdown()
+	cluster.RemoveNode(node3.BindAddr())
+
+	_, ok = sub.WaitPeerLeftWithTimeout(time.Second * 10)
+	assert.True(t, ok)
+}

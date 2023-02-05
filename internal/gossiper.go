@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -15,18 +16,20 @@ type peerVersionDelta struct {
 }
 
 type Gossiper struct {
-	peerMap        *PeerMap
-	transport      Transport
-	maxMessageSize int
-	logger         *zap.Logger
+	peerMap         *PeerMap
+	transport       Transport
+	failureDetector *FailureDetector
+	maxMessageSize  int
+	logger          *zap.Logger
 }
 
-func NewGossiper(peerMap *PeerMap, transport Transport, maxMessageSize int, logger *zap.Logger) *Gossiper {
+func NewGossiper(peerMap *PeerMap, transport Transport, failureDetector *FailureDetector, maxMessageSize int, logger *zap.Logger) *Gossiper {
 	return &Gossiper{
-		peerMap:        peerMap,
-		transport:      transport,
-		maxMessageSize: maxMessageSize,
-		logger:         logger,
+		peerMap:         peerMap,
+		transport:       transport,
+		failureDetector: failureDetector,
+		maxMessageSize:  maxMessageSize,
+		logger:          logger,
 	}
 }
 
@@ -100,14 +103,37 @@ func (g *Gossiper) Seed(seeds []string) {
 	}
 }
 
-func (g *Gossiper) RandomPeer() (string, bool) {
+func (g *Gossiper) RandomUpPeer() (string, bool) {
 	if len(g.peerMap.Addrs(false)) == 0 {
 		return "", false
 	}
 
-	// Scuttlebutt with a random peer (excluding ourselves).
 	addrs := g.peerMap.Addrs(false)
 	return addrs[rand.Intn(len(addrs))], true
+}
+
+func (g *Gossiper) RandomDownPeer() (string, bool) {
+	if len(g.peerMap.DownPeers()) == 0 {
+		return "", false
+	}
+
+	addrs := g.peerMap.DownPeers()
+	return addrs[rand.Intn(len(addrs))], true
+}
+
+func (g *Gossiper) CheckLiveness() {
+	for _, addr := range g.peerMap.Addrs(false) {
+		if g.failureDetector.PeerStatus(addr) == PeerStatusDown {
+			g.peerMap.SetStatusDown(addr, time.Now().Add(time.Hour))
+		} else {
+			g.peerMap.SetStatusUp(addr)
+		}
+	}
+
+	// Remove any peers that have been dead for long enough to expire.
+	for _, addr := range g.peerMap.RemoveExpiredPeers() {
+		g.failureDetector.RemovePeer(addr)
+	}
 }
 
 func (g *Gossiper) Close() error {
@@ -191,6 +217,8 @@ func (g *Gossiper) onDigestResponse(resp []Digest, fromAddr string) error {
 }
 
 func (g *Gossiper) onDigestSync(sync []Digest, fromAddr string, sendDigestResponse bool) error {
+	g.failureDetector.Report(fromAddr)
+
 	for _, digest := range sync {
 		g.peerMap.ApplyDigest(digest)
 	}

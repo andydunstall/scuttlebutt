@@ -31,7 +31,9 @@ func (e *NodeSubscriber) OnJoin(addr string) {
 	e.PeerJoinedCh <- addr
 }
 
-func (e *NodeSubscriber) OnLeave(addr string) {}
+func (e *NodeSubscriber) OnLeave(addr string) {
+	e.PeerLeftCh <- addr
+}
 
 func (e *NodeSubscriber) OnUpdate(addr string, key string, value string) {
 	e.PeerUpdatedCh <- peerUpdate{
@@ -53,6 +55,15 @@ func (s *NodeSubscriber) WaitPeerUpdatedWithTimeout(t time.Duration) (peerUpdate
 func (s *NodeSubscriber) WaitPeerJoinedWithTimeout(t time.Duration) (string, bool) {
 	select {
 	case addr := <-s.PeerJoinedCh:
+		return addr, true
+	case <-time.After(t):
+		return "", false
+	}
+}
+
+func (s *NodeSubscriber) WaitPeerLeftWithTimeout(t time.Duration) (string, bool) {
+	select {
+	case addr := <-s.PeerLeftCh:
 		return addr, true
 	case <-time.After(t):
 		return "", false
@@ -88,6 +99,10 @@ func (c *Cluster) AddNode(nodeSub *NodeSubscriber) (*scuttlebutt.Scuttlebutt, er
 	}
 	c.nodes[node.BindAddr()] = node
 	return node, nil
+}
+
+func (c *Cluster) RemoveNode(addr string) {
+	delete(c.nodes, addr)
 }
 
 func (c *Cluster) Shutdown() error {

@@ -8,6 +8,10 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	failureDetectorSampleSize = 1000
+)
+
 // Scuttlebutt handles cluster membership using the scuttlebutt protocol.
 // This is thread safe.
 type Scuttlebutt struct {
@@ -106,7 +110,15 @@ func newScuttlebutt(addr string, opts *Options) (*Scuttlebutt, error) {
 		opts.Logger,
 	)
 	gossip.gossiper = internal.NewGossiper(
-		peerMap, transport, opts.MaxMessageSize, opts.Logger,
+		peerMap,
+		transport,
+		internal.NewFailureDetector(
+			uint64(opts.Interval.Nanoseconds()),
+			failureDetectorSampleSize,
+			opts.ConvictionThreshold,
+		),
+		opts.MaxMessageSize,
+		opts.Logger,
 	)
 
 	return gossip, nil
@@ -134,13 +146,28 @@ func (s *Scuttlebutt) gossipLoop() {
 }
 
 func (s *Scuttlebutt) round() {
-	addr, ok := s.gossiper.RandomPeer()
+	s.gossipToUpPeer()
+	s.gossiper.CheckLiveness()
+	s.gossipToDownPeer()
+}
+
+func (s *Scuttlebutt) gossipToUpPeer() {
+	addr, ok := s.gossiper.RandomUpPeer()
 	if !ok {
 		// If we don't know about any other peers in the cluster re-seed.
 		s.seed()
 		return
 	}
+	s.gossiper.SendDigestRequest(addr)
+}
 
+func (s *Scuttlebutt) gossipToDownPeer() {
+	addr, ok := s.gossiper.RandomDownPeer()
+	if !ok {
+		// If we don't know about any other peers in the cluster re-seed.
+		s.seed()
+		return
+	}
 	s.gossiper.SendDigestRequest(addr)
 }
 

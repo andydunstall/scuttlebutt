@@ -17,9 +17,6 @@ changes.
 
 The implementation is described in [docs/](docs/).
 
-**WIP**
-* Working on adding the failure detector described in [docs/](docs/)
-
 ## Usage
 The full API docs can be viewed with `go doc --all`.
 
@@ -97,25 +94,3 @@ $ go test ./...
 Theres a CLI tool in `eval/` that can be used to evaluate the cluster. Such
 as the time it takes to propagate an update to all nodes in a cluster with
 64 nodes.
-
-## Future Improvements
-
-### Configuration
-Adding default configuration would be useful, similar to memberlists `DefaultLAN`
-and `DefaultWAN` config.
-
-Also being able to configure the initial state for the node before it joins the
-cluster.
-
-### Failure Detector
-Currently its left to the application to detect failed nodes, though this could
-be done within the library itself.
-
-Similarly theres no way for a node to explicitly leave the cluster.
-
-### Evaluation
-Evaluating how nodes behave under different loads and chaos would be useful,
-and doing some CPU profilings to look for any optimisations.
-
-Could use something like [toxiproxy](https://github.com/Shopify/toxiproxy)
-to inject faults.

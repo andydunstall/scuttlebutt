@@ -7,8 +7,9 @@ import (
 )
 
 const (
-	DefaultMaxMessageSize = 512
-	DefaultInterval       = time.Millisecond * 500
+	DefaultMaxMessageSize      = 512
+	DefaultConvictionThreshold = 8.0
+	DefaultInterval            = time.Millisecond * 500
 )
 
 type Options struct {
@@ -21,7 +22,8 @@ type Options struct {
 	// OnJoin is invoked when a peer joins the cluster.
 	OnJoin func(peerAddr string)
 
-	// OnLeave is invoked when a peer joins the cluster.
+	// OnLeave is invoked when a peer leaves the cluster or is considered
+	// inactive.
 	OnLeave func(peerAddr string)
 
 	// OnUpdate is invoked when a peers state is updated.
@@ -31,6 +33,10 @@ type Options struct {
 	// If the MTU is known this should be increased to the maximum size. If not
 	// set default to 512 bytes.
 	MaxMessageSize int
+
+	// ConvictionThreshold is the value if phi in the failure detector to
+	// consider a node down. If not set defaults to 8.0.
+	ConvictionThreshold float64
 
 	// Interval is the time between gossip rounds, when the node selects
 	// a random peer to sync with.
@@ -72,6 +78,12 @@ func WithMaxMessageSize(size int) Option {
 	}
 }
 
+func WithConvictionThreshold(convictionThreshold float64) Option {
+	return func(opts *Options) {
+		opts.ConvictionThreshold = convictionThreshold
+	}
+}
+
 func WithInterval(interval time.Duration) Option {
 	return func(opts *Options) {
 		opts.Interval = interval
@@ -87,12 +99,13 @@ func WithLogger(logger *zap.Logger) Option {
 func defaultOptions() *Options {
 	l, _ := zap.NewDevelopment()
 	return &Options{
-		SeedCB:         nil,
-		OnJoin:         nil,
-		OnLeave:        nil,
-		OnUpdate:       nil,
-		MaxMessageSize: DefaultMaxMessageSize,
-		Interval:       DefaultInterval,
-		Logger:         l,
+		SeedCB:              nil,
+		OnJoin:              nil,
+		OnLeave:             nil,
+		OnUpdate:            nil,
+		MaxMessageSize:      DefaultMaxMessageSize,
+		ConvictionThreshold: DefaultConvictionThreshold,
+		Interval:            DefaultInterval,
+		Logger:              l,
 	}
 }

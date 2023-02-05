@@ -46,12 +46,14 @@ func TestGossiper_SyncState(t *testing.T) {
 			gossiper1 := NewGossiper(
 				map1,
 				nil,
+				NewFailureDetector(1000000, 1000, 8.0),
 				maxMessageSize,
 				zap.NewNop(),
 			)
 			gossiper2 := NewGossiper(
 				map2,
 				nil,
+				NewFailureDetector(1000000, 1000, 8.0),
 				maxMessageSize,
 				zap.NewNop(),
 			)
