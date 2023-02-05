@@ -166,31 +166,3 @@ as the largest key-value version.
 
 We may also receive a digest responds, which we respond too the same as
 a digest request, except don't send another digest response.
-
-## Codec
-Each message is prefixed with a 1 byte (`uint8`) type:
-* `DIGEST-REQUEST`: `1`
-* `DIGEST-RESPONSE`: `2`
-* `DELTA`: `3`
-
-Since only UDP is supported no framing information is needed.
-
-Variable size strings (such as the peer address) are prefixed with
-their `uint8` size.
-
-### `DIGEST-REQUEST`
-Contains a list of entries appended together, each containing:
-* Peer address: Encoded string (note we encode as a string rather than integer
-format as support custom transports where the address format is unknown),
-* Peer version: `uint64`
-
-### `DIGEST-RESPONSE`
-This is the same format as `DIGEST-REQUEST` except has a different type to
-indicate the receiver should not respond with its own digest.
-
-### `DELTA`
-Contains a list of entries appended together, each containing:
-* Peer address: Encoded string,
-* Key: Encoded string,
-* Value: Encoded string,
-* Version: `uint64`
