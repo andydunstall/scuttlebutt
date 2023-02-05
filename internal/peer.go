@@ -2,6 +2,7 @@ package internal
 
 import (
 	"sort"
+	"time"
 )
 
 type PeerEntry struct {
@@ -17,6 +18,10 @@ type Peer struct {
 	version uint64
 	// entries contains the peer state to be propagated around the cluster.
 	entries map[string]PeerEntry
+	// status indicates whether the peer is considered up or down.
+	status PeerStatus
+	// expiry is the time the peer should be removed if it is still down.
+	expiry time.Time
 }
 
 // NewPeer returns a new peer with the given address, with a version of 0 to
@@ -26,6 +31,7 @@ func NewPeer(addr string) *Peer {
 		addr:    addr,
 		version: 0,
 		entries: make(map[string]PeerEntry),
+		status:  PeerStatusUp,
 	}
 }
 
@@ -35,6 +41,31 @@ func (p *Peer) Addr() string {
 
 func (p *Peer) Version() uint64 {
 	return p.version
+}
+
+func (p *Peer) Status() PeerStatus {
+	return p.status
+}
+
+func (p *Peer) Expiry() time.Time {
+	return p.expiry
+}
+
+func (p *Peer) SetStatusUp() {
+	p.status = PeerStatusUp
+	p.expiry = time.Time{}
+}
+
+// SetStatusDown sets the status to down and sets the expiry of when the
+// peer should be removed if it hasen't come up.
+func (p *Peer) SetStatusDown(expiry time.Time) {
+	// Check if the peer is already down to avoid resetting the expiry.
+	if p.status == PeerStatusDown {
+		return
+	}
+
+	p.status = PeerStatusDown
+	p.expiry = expiry
 }
 
 func (p *Peer) Lookup(key string) (PeerEntry, bool) {

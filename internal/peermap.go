@@ -2,6 +2,7 @@ package internal
 
 import (
 	"sync"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -48,17 +49,35 @@ func NewPeerMap(
 	}
 }
 
-// Addrs returns the addresses of the peers known by this node. If includeLocal
-// is true the local node is included, otherwise it isn't.
+// Addrs returns the addresses of the up peers known by this node. If
+// includeLocal is true the local node is included, otherwise it isn't.
 func (m *PeerMap) Addrs(includeLocal bool) []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	peers := make([]string, 0, len(m.peers))
-	for addr, _ := range m.peers {
+	for addr, peer := range m.peers {
+		if peer.Status() != PeerStatusUp {
+			continue
+		}
+
 		if includeLocal || addr != m.localAddr {
 			peers = append(peers, addr)
 		}
+	}
+	return peers
+}
+
+func (m *PeerMap) DownPeers() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	peers := make([]string, 0, len(m.peers))
+	for addr, peer := range m.peers {
+		if peer.Status() != PeerStatusDown {
+			continue
+		}
+		peers = append(peers, addr)
 	}
 	return peers
 }
@@ -109,6 +128,53 @@ func (m *PeerMap) UpdateLocal(key string, value string) {
 	m.logger.Debug("update local", zap.String("key", key), zap.String("value", value))
 
 	m.peers[m.localAddr].UpdateLocal(key, value)
+}
+
+func (m *PeerMap) SetStatusUp(addr string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	peer, ok := m.peers[addr]
+	if !ok {
+		return
+	}
+
+	// Check if the status has changed to avoid sending duplicate notifications.
+	if peer.Status() == PeerStatusUp {
+		return
+	}
+
+	peer.SetStatusUp()
+
+	if m.onJoin != nil {
+		m.onJoin(addr)
+	}
+}
+
+func (m *PeerMap) SetStatusDown(addr string, expiry time.Time) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// The local peers state is always active.
+	if addr == m.localAddr {
+		return
+	}
+
+	peer, ok := m.peers[addr]
+	if !ok {
+		return
+	}
+
+	// Check if the status has changed to avoid sending duplicate notifications.
+	if peer.Status() == PeerStatusDown {
+		return
+	}
+
+	peer.SetStatusDown(expiry)
+
+	if m.onLeave != nil {
+		m.onLeave(addr)
+	}
 }
 
 func (m *PeerMap) Digest(addr string) Digest {
@@ -190,4 +256,22 @@ func (m *PeerMap) ApplyDelta(delta Delta) {
 		m.onUpdate(delta.Addr, delta.Key, delta.Value)
 		m.mu.Lock()
 	}
+}
+
+func (m *PeerMap) RemoveExpiredPeers() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	expired := []string{}
+	for addr, peer := range m.peers {
+		if peer.Expiry().After(time.Now()) {
+			expired = append(expired, addr)
+		}
+	}
+
+	for _, addr := range expired {
+		delete(m.peers, addr)
+	}
+
+	return expired
 }

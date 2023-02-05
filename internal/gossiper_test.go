@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"net"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
@@ -21,9 +20,9 @@ func newFakeTransport(target *Gossiper) Transport {
 	}
 }
 
-func (t *fakeTransport) WriteTo(b []byte, addr string) (time.Time, error) {
+func (t *fakeTransport) WriteTo(b []byte, addr string) error {
 	t.target.OnMessage(b, "")
-	return time.Time{}, nil
+	return nil
 }
 
 func (t *fakeTransport) BindAddr() string {
@@ -47,12 +46,14 @@ func TestGossiper_SyncState(t *testing.T) {
 			gossiper1 := NewGossiper(
 				map1,
 				nil,
+				NewFailureDetector(1000000, 1000, 8.0),
 				maxMessageSize,
 				zap.NewNop(),
 			)
 			gossiper2 := NewGossiper(
 				map2,
 				nil,
+				NewFailureDetector(1000000, 1000, 8.0),
 				maxMessageSize,
 				zap.NewNop(),
 			)
