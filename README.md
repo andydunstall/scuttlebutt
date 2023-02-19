@@ -1,4 +1,7 @@
 # Scuttlebutt
+
+> :warning: **Still in development.**
+
 A Go library that facilitates cluster membership and state propagation using the
 [Scuttlebutt](https://www.cs.cornell.edu/home/rvr/papers/flowgossip.pdf)
 protocol.
