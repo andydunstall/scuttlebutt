@@ -264,7 +264,12 @@ func (m *PeerMap) RemoveExpiredPeers() []string {
 
 	expired := []string{}
 	for addr, peer := range m.peers {
-		if peer.Expiry().After(time.Now()) {
+		if peer.Status() == PeerStatusDown && time.Now().After(peer.Expiry()) {
+			m.logger.Info(
+				"remove expired peer",
+				zap.String("addr", addr),
+				zap.Int64("expiry", peer.Expiry().UnixMilli()),
+			)
 			expired = append(expired, addr)
 		}
 	}

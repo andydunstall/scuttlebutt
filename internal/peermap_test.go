@@ -128,14 +128,14 @@ func TestPeerMap_RemoveExpiredPeers(t *testing.T) {
 		Addr:    "10.26.104.11:8119",
 		Version: 12,
 	})
-	pm.SetStatusDown("10.26.104.11:8119", time.Now().Add(-time.Minute))
+	pm.SetStatusDown("10.26.104.11:8119", time.Now().Add(time.Minute))
 
 	// Add a down peer who has not expired.
 	pm.ApplyDigest(Digest{
 		Addr:    "10.26.104.12:6823",
 		Version: 21,
 	})
-	pm.SetStatusDown("10.26.104.12:6823", time.Now().Add(time.Minute))
+	pm.SetStatusDown("10.26.104.12:6823", time.Now().Add(-time.Minute))
 
 	assert.Equal(t, []string{"10.26.104.12:6823"}, pm.RemoveExpiredPeers())
 	assert.Equal(t, []string{"10.26.104.11:8119"}, pm.DownPeers())
